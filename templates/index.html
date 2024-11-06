@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browser Fingerprinting Demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Browser Fingerprinting Demo</h1>
+        <p>This demo collects and displays various browser fingerprinting metrics and debugging information.</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>Live Fingerprint Data</h2>
+            <pre id="debugOutput" class="loading">Collecting data...</pre>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,30 +1,30 @@
-# app.py
-from flask import Flask, request, jsonify, render_template
-import sqlite3
-from datetime import datetime
-import os
 import argparse
+from flask import Flask, request, jsonify, render_template
+import psycopg2
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-DATABASE = "data/debug_data.db"
+DATABASE_URL = os.getenv("DB_URL")
 
 
 
 def init_db():
-    if not os.path.exists("data"):
-        os.makedirs("data")
-    conn = sqlite3.connect(DATABASE)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS debug_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             ip TEXT,
             browser_info TEXT,
             performance_data TEXT,
             fingerprints TEXT,
             errors TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
@@ -50,10 +50,10 @@ def collect():
             "timestamp": data.get("timestamp")
         }
         
-        conn = sqlite3.connect(DATABASE)
+        conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO debug_data (ip, browser_info, performance_data, fingerprints, errors) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO debug_data (ip, browser_info, performance_data, fingerprints, errors) VALUES (%s, %s, %s, %s, %s)",
             (
                 debug_info["ip"],
                 str(debug_info["browser"]),

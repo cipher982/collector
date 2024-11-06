@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 COPY . .
-RUN pip install flask psycopg2-binary python-dotenv
+RUN pip install uv
 
-CMD ["python", "app.py"]
+# Install dependencies
+RUN uv sync
+
+CMD ["uv", "run", "python", "app.py"]

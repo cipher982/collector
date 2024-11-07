@@ -5,6 +5,12 @@ services:
       - "5001:5000"
     networks:
       - coolify
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
 
 networks:
   default:

@@ -93,6 +93,17 @@ def collect():
         return jsonify({"message": "Internal Server Error"}), 500
 
 
+@app.route("/health")
+def health():
+    try:
+        # Test database connection
+        conn = psycopg2.connect(DATABASE_URL)
+        conn.close()
+        return jsonify({"status": "healthy", "database": "connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "database": str(e)}), 500
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="Host address")

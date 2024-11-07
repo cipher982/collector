@@ -4,28 +4,125 @@
     <meta charset="UTF-8">
     <title>Browser Fingerprinting Demo</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
+            padding: 20px;
         }
         .loading {
             color: #666;
             font-style: italic;
+        }
+        .tab-container {
+            margin: 20px 0;
+        }
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            border: none;
+            background: #e9ecef;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #1095c1;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-good {
+            background-color: #2ecc71;
+        }
+        .status-warning {
+            background-color: #f1c40f;
+        }
+        .status-error {
+            background-color: #e74c3c;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .chart-container {
+            height: 300px;
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
     <header>
         <h1>Browser Fingerprinting Demo</h1>
-        <p>This demo collects and displays various browser fingerprinting metrics and debugging information.</p>
+        <p>Real-time browser fingerprinting metrics and system information dashboard.</p>
     </header>
 
     <main>
-        <section>
-            <h2>Live Fingerprint Data</h2>
-            <pre id="debugOutput" class="loading">Collecting data...</pre>
-        </section>
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="overview">Overview</button>
+                <button class="tab-button" data-tab="performance">Performance</button>
+                <button class="tab-button" data-tab="fingerprint">Fingerprint</button>
+                <button class="tab-button" data-tab="raw">Raw Data</button>
+            </div>
+
+            <div id="overview" class="tab-content active">
+                <div class="grid">
+                    <div class="metric-card">
+                        <h3>System Status</h3>
+                        <div id="systemStatus"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Browser Information</h3>
+                        <div id="browserInfo"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="performance" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+                <div id="performanceMetrics"></div>
+            </div>
+
+            <div id="fingerprint" class="tab-content">
+                <div class="grid">
+                    <div class="metric-card">
+                        <h3>Canvas Fingerprint</h3>
+                        <div id="canvasFingerprint"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Fonts Available</h3>
+                        <div id="fontFingerprint"></div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>WebGL Information</h3>
+                        <div id="webglInfo"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="raw" class="tab-content">
+                <pre id="debugOutput" class="loading">Collecting data...</pre>
+            </div>
+        </div>
     </main>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

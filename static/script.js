@@ -107,10 +107,121 @@ const collectors = {
     }
 };
 
-// UI handling
+// Enhanced UI handling
 const ui = {
+    initializeTabs() {
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                button.classList.add('active');
+                document.getElementById(button.dataset.tab).classList.add('active');
+            });
+        });
+    },
+
+    displaySystemStatus(data) {
+        const statusDiv = document.getElementById('systemStatus');
+        const items = [
+            { label: 'Online Status', value: data.browser.onLine, good: data.browser.onLine },
+            { label: 'Cookies Enabled', value: data.browser.cookiesEnabled, good: data.browser.cookiesEnabled },
+            { label: 'Do Not Track', value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
+            { label: 'Memory Available', value: `${data.browser.deviceMemory}GB`, good: data.browser.deviceMemory > 4 }
+        ];
+
+        statusDiv.innerHTML = items.map(item => `
+            <div>
+                <span class="status-indicator ${item.good ? 'status-good' : 'status-warning'}"></span>
+                <strong>${item.label}:</strong> ${item.value}
+            </div>
+        `).join('');
+    },
+
+    displayBrowserInfo(data) {
+        const browserDiv = document.getElementById('browserInfo');
+        browserDiv.innerHTML = `
+            <div><strong>Platform:</strong> ${data.browser.platform}</div>
+            <div><strong>User Agent:</strong> ${data.browser.userAgent}</div>
+            <div><strong>Language:</strong> ${data.browser.language}</div>
+            <div><strong>Screen Resolution:</strong> ${data.browser.screenResolution}</div>
+            <div><strong>Hardware Concurrency:</strong> ${data.browser.hardwareConcurrency}</div>
+        `;
+    },
+
+    displayPerformanceChart(data) {
+        const resources = data.performance.resources;
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        
+        const resourceData = resources.slice(0, 10).reduce((acc, resource) => {
+            acc.labels.push(resource.name.split('/').pop());
+            acc.durations.push(resource.duration);
+            acc.sizes.push(resource.size / 1024); // Convert to KB
+            return acc;
+        }, { labels: [], durations: [], sizes: [] });
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: resourceData.labels,
+                datasets: [{
+                    label: 'Load Time (ms)',
+                    data: resourceData.durations,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Size (KB)',
+                    data: resourceData.sizes,
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    },
+
+    displayFingerprints(data) {
+        // Canvas Fingerprint
+        const canvasDiv = document.getElementById('canvasFingerprint');
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 50;
+        canvasDiv.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = data.fingerprints.canvas;
+
+        // Fonts
+        const fontsDiv = document.getElementById('fontFingerprint');
+        fontsDiv.innerHTML = `
+            <div class="grid">
+                ${data.fingerprints.fonts.map(font => `
+                    <div class="metric-card" style="font-family: ${font}">${font}</div>
+                `).join('')}
+            </div>
+        `;
+
+        // WebGL
+        const webglDiv = document.getElementById('webglInfo');
+        const webgl = data.fingerprints.webgl;
+        webglDiv.innerHTML = `
+            <div><strong>Vendor:</strong> ${webgl.vendor}</div>
+            <div><strong>Renderer:</strong> ${webgl.renderer}</div>
+            <div><strong>WebGL Version:</strong> ${webgl.webglVersion}</div>
+        `;
+    },
+
     displayDebugInfo(data) {
-        const debugOutput = document.getElementById("debugOutput");
+        const debugOutput = document.getElementById('debugOutput');
         if (debugOutput) {
             debugOutput.textContent = JSON.stringify(data, null, 2);
         }
@@ -148,11 +259,17 @@ function collectData() {
         errors
     };
 
+    ui.displaySystemStatus(data);
+    ui.displayBrowserInfo(data);
+    ui.displayPerformanceChart(data);
+    ui.displayFingerprints(data);
     ui.displayDebugInfo(data);
 
-    // Send data after delay to capture load errors
     setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);
 }
 
 // Initialize
-window.onload = collectData;
+window.onload = () => {
+    ui.initializeTabs();
+    collectData();
+};

@@ -3,3 +3,12 @@ services:
     build: .
     ports:
       - "5001:5000"
+
+networks:
+  default:
+  monitoring:
+    name: monitoring
+    external: true
+  coolify:
+    name: coolify
+    external: true

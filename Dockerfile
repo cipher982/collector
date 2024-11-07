@@ -7,5 +7,4 @@ RUN pip install uv
 # Install dependencies
 RUN uv sync
 
-# CMD ["uv", "run", "python", "app.py"]
-CMD ["tail", "-f", "/dev/null"]
+CMD ["uv", "run", "python", "app.py"]

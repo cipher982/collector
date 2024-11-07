@@ -22,21 +22,27 @@ logger.info(f"DATABASE_URL: {DATABASE_URL}")
 
 
 def init_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS debug_data (
-            id SERIAL PRIMARY KEY,
-            ip TEXT,
-            browser_info TEXT,
-            performance_data TEXT,
-            fingerprints TEXT,
-            errors TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        logger.info("Attempting database connection...")
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS debug_data (
+                id SERIAL PRIMARY KEY,
+                ip TEXT,
+                browser_info TEXT,
+                performance_data TEXT,
+                fingerprints TEXT,
+                errors TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+        logger.info("Database initialization successful")
+    except psycopg2.Error as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
 
 
 @app.route("/")

@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 
 import psycopg2
@@ -8,12 +9,16 @@ from flask import jsonify
 from flask import render_template
 from flask import request
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 app = Flask(__name__)
 
 
 DATABASE_URL = os.getenv("DB_URL")
+logger.info(f"DATABASE_URL: {DATABASE_URL}")
 
 
 def init_db():

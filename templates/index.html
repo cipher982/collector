@@ -5,6 +5,8 @@
     <title>Browser Fingerprinting Demo</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Small 2kB RUM helper for Core Web Vitals -->
+    <script src="https://unpkg.com/web-vitals@3/dist/web-vitals.iife.min.js" defer></script>
     <style>
         body {
             max-width: 1200px;
@@ -99,8 +101,14 @@
             <div class="tab-buttons">
                 <button class="tab-button active" data-tab="overview">Overview</button>
                 <button class="tab-button" data-tab="performance">Performance</button>
+                <button class="tab-button" data-tab="vitals">Vitals</button>
                 <button class="tab-button" data-tab="fingerprint">Fingerprint</button>
                 <button class="tab-button" data-tab="raw">Raw Data</button>
+            </div>
+
+            <!-- Core Web Vitals tab -->
+            <div id="vitals" class="tab-content">
+                <div class="grid" id="coreVitals"></div>
             </div>
 
             <div id="overview" class="tab-content active">

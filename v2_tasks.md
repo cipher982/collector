@@ -1,19 +1,20 @@
 ## A. Immediate (0-2 weeks) – “Deeper capture, quick visuals”
 
-    1. Core Web Vitals
-        • Grab LCP, FID, CLS via the web-vitals npm micro-library (2 kB) and push them in the
-existing JSON payload.
-        • UI: gauge cards that light green/yellow/red vs Google good-thresholds.
-    2. Network & device context
-        • navigator.connection (RTT, downlink, effectiveType)
-        • Battery status (level, charging)
-        • Device orientation + screen colour-depth
-        • Add status chips in the Overview tab (“4 G • 50 ms RTT • 78 % battery”).
-    3. Mini waterfall chart
+    1. Core Web Vitals  ✅ *COMPLETED 2025-05-04*
+        • LCP, FID, CLS gathered via `web-vitals@3` CDN bundle.  
+        • Added `performance.webVitals` to JSON payload.  
+        • “Vitals” tab shows colour-coded cards (green / amber / red).
+
+    2. Network & device context  ✅ *COMPLETED 2025-05-04*
+        • navigator.connection (effectiveType, rtt, downlink, saveData) captured.  
+        • Battery API (level %, charging) captured asynchronously.  
+        • Screen orientation + colour-depth added to browser info.  
+        • Overview tab now displays network/battery chips alongside existing status chips.
+    3. Mini waterfall chart  ⬜ *TODO*
         • Re-use the resource entries you already collect.
         • Draw an HTTP waterfall with Chart.js “bar with offset” mode; hover shows DNS/TTFB/transfer
     durations.
-    4. Dark-mode + theme switcher
+    4. Dark-mode + theme switcher  ⬜ *TODO*
         • PicoCSS supports data-theme attr; let users toggle “light / dark / synthwave”.
 
 ---------------------------------------------------------------------------------------------------
@@ -66,7 +67,17 @@ sluggish on 3 G devices because …”.
 
 ## Key code changes distilled
 
-• static/web-vitals.js  – import {getCLS, getFID, getLCP} and push to collectors.performance.
-• static/script.js      – new collectors.getNetworkInfo(), getBatteryInfo().
-• templates/index.html  – add tabs: “Vitals”, “Waterfall”, “Compare”.
-• static/dashboard.js   – Chart.js live timeline, d3 treemap, diff viewer.
+### Key code changes already landed
+
+• Added `web-vitals` via CDN in `templates/index.html`; no extra build step needed.  
+• `static/script.js`  
+    – collectors.getWebVitals(), getNetworkInfo(), getBatteryInfo()  
+    – UI helpers to render Vitals and chips.  
+• `templates/index.html`  
+    – New “Vitals” tab and script include.  
+
+### Upcoming code to write
+
+• Mini waterfall (Chart.js bar-offset) – could live inside existing `script.js` or separate `waterfall.js`.  
+• Theme switcher – small toggler manipulating `document.documentElement.dataset.theme`.  
+• After Immediate tasks: new tabs (“Compare”, etc.), websocket endpoint, d3 treemap, diff viewer.

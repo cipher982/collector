@@ -17,7 +17,9 @@ const collectors = {
             doNotTrack: navigator.doNotTrack,
             deviceMemory: navigator.deviceMemory,
             hardwareConcurrency: navigator.hardwareConcurrency,
-            screenResolution: `${window.screen.width}x${window.screen.height}`
+            screenResolution: `${window.screen.width}x${window.screen.height}`,
+            colorDepth: window.screen.colorDepth,
+            orientation: (screen.orientation && screen.orientation.type) || window.orientation || "unknown"
         };
     },
 
@@ -32,8 +34,43 @@ const collectors = {
                 duration: resource.duration,
                 size: resource.transferSize,
                 type: resource.initiatorType
-            }))
+            })),
+            webVitals: {} // will be filled asynchronously
         };
+    },
+
+    // ------------------------------------------------------------------
+    // Network Information API
+    // ------------------------------------------------------------------
+    getNetworkInfo() {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!connection) return {};
+
+        return {
+            effectiveType: connection.effectiveType,
+            downlink: connection.downlink, // Mbps
+            rtt: connection.rtt, // ms
+            saveData: connection.saveData
+        };
+    },
+
+    // ------------------------------------------------------------------
+    // Battery Status API (async)
+    // ------------------------------------------------------------------
+    async getBatteryInfo() {
+        if (!navigator.getBattery) {
+            return {};
+        }
+
+        try {
+            const battery = await navigator.getBattery();
+            return {
+                level: Math.round(battery.level * 100), // percentage
+                charging: battery.charging
+            };
+        } catch {
+            return {};
+        }
     },
 
     // Error Tracking
@@ -104,6 +141,44 @@ const collectors = {
             shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
             extensions: gl.getSupportedExtensions()
         };
+    },
+
+    // ------------------------------------------------------------------
+    // Core Web Vitals helpers (LCP, FID, CLS)
+    // ------------------------------------------------------------------
+    getWebVitals() {
+        return new Promise(resolve => {
+            const vitals = {};
+
+            // The global webVitals object is provided by the external script
+            // included in index.html. Guard in case the CDN failed.
+            if (typeof window.webVitals === "undefined") {
+                resolve(vitals);
+                return;
+            }
+
+            let remaining = 3;
+
+            const done = () => {
+                remaining -= 1;
+                if (remaining === 0) {
+                    resolve(vitals);
+                }
+            };
+
+            window.webVitals.getLCP(metric => {
+                vitals[metric.name] = metric.value;
+                done();
+            });
+            window.webVitals.getFID(metric => {
+                vitals[metric.name] = metric.value;
+                done();
+            });
+            window.webVitals.getCLS(metric => {
+                vitals[metric.name] = metric.value;
+                done();
+            });
+        });
     }
 };
 
@@ -123,11 +198,23 @@ const ui = {
     displaySystemStatus(data) {
         const statusDiv = document.getElementById('systemStatus');
         const items = [
-            { label: 'Online Status', value: data.browser.onLine, good: data.browser.onLine },
-            { label: 'Cookies Enabled', value: data.browser.cookiesEnabled, good: data.browser.cookiesEnabled },
-            { label: 'Do Not Track', value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
-            { label: 'Memory Available', value: `${data.browser.deviceMemory}GB`, good: data.browser.deviceMemory > 4 }
+            { label: 'Online', value: data.browser.onLine ? 'Yes' : 'No', good: data.browser.onLine },
+            { label: 'Cookies', value: data.browser.cookiesEnabled ? 'Enabled' : 'Disabled', good: data.browser.cookiesEnabled },
+            { label: 'DNT', value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
+            { label: 'Memory', value: `${data.browser.deviceMemory}GB`, good: data.browser.deviceMemory > 4 }
         ];
+
+        // Network chip (if available)
+        if (data.network && Object.keys(data.network).length) {
+            const netLabel = `${data.network.effectiveType?.toUpperCase() || 'Net'} • ${data.network.rtt ?? '?'} ms RTT`;
+            items.unshift({ label: 'Network', value: netLabel, good: data.network.rtt && data.network.rtt < 150 });
+        }
+
+        // Battery chip (if available)
+        if (data.battery && Object.keys(data.battery).length) {
+            const batteryLabel = `${data.battery.level}%${data.battery.charging ? ' ⚡︎' : ''}`;
+            items.push({ label: 'Battery', value: batteryLabel, good: data.battery.level > 20 });
+        }
 
         statusDiv.innerHTML = items.map(item => `
             <div>
@@ -145,6 +232,8 @@ const ui = {
             <div><strong>Language:</strong> ${data.browser.language}</div>
             <div><strong>Screen Resolution:</strong> ${data.browser.screenResolution}</div>
             <div><strong>Hardware Concurrency:</strong> ${data.browser.hardwareConcurrency}</div>
+            <div><strong>Colour Depth:</strong> ${data.browser.colorDepth} bit</div>
+            <div><strong>Orientation:</strong> ${data.browser.orientation}</div>
         `;
     },
 
@@ -241,6 +330,46 @@ const ui = {
         `;
     },
 
+    // ------------------------------------------------------------------
+    // Core Web Vitals cards
+    // ------------------------------------------------------------------
+    displayWebVitals(data) {
+        const container = document.getElementById("coreVitals");
+        if (!container) return;
+
+        const vitals = data.performance.webVitals || {};
+
+        const thresholds = {
+            LCP: 2500, // Good ≤ 2.5s
+            FID: 100,  // Good ≤ 100ms
+            CLS: 0.1   // Good ≤ 0.1
+        };
+
+        container.innerHTML = Object.keys(thresholds)
+            .map(name => {
+                const value = vitals[name] ?? "–";
+
+                let cls = "status-warning"; // default when not good
+                if (value === "–") {
+                    cls = "status-warning";
+                } else if (value <= thresholds[name]) {
+                    cls = "status-good";
+                } else if (value <= thresholds[name] * 1.5) {
+                    cls = "status-warning";
+                } else {
+                    cls = "status-error";
+                }
+
+                return `
+                    <div class="metric-card">
+                        <span class="status-indicator ${cls}"></span>
+                        <strong>${name}</strong>: ${typeof value === "number" ? value.toFixed(2) : value}
+                    </div>
+                `;
+            })
+            .join("");
+    },
+
     displayDebugInfo(data) {
         const debugOutput = document.getElementById('debugOutput');
         if (debugOutput) {
@@ -265,9 +394,9 @@ async function submitData(data) {
 }
 
 // Main collection function
-function collectData() {
+async function collectData() {
     const errors = collectors.setupErrorTracking();
-    
+
     const data = {
         timestamp: new Date().toISOString(),
         browser: collectors.getBrowserInfo(),
@@ -277,13 +406,20 @@ function collectData() {
             fonts: collectors.getFontFingerprint(),
             webgl: collectors.getWebGLInfo()
         },
+        network: collectors.getNetworkInfo(),
+        battery: await collectors.getBatteryInfo(),
         errors
     };
 
+    // Capture Core Web Vitals before rendering UI; they resolve quickly
+    data.performance.webVitals = await collectors.getWebVitals();
+
+    // Render UI sections
     ui.displaySystemStatus(data);
     ui.displayBrowserInfo(data);
     ui.displayPerformanceChart(data);
     ui.displayFingerprints(data);
+    ui.displayWebVitals(data);
     ui.displayDebugInfo(data);
 
     setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);

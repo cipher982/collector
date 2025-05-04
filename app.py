@@ -1,48 +1,48 @@
+"""Flask entry-point for the Browser Debug Dashboard.
+
+The module is intentionally slim – it delegates all persistence work to
+`db.py` and keeps only routing and request/response concerns here.
+"""
+
+from __future__ import annotations
+
 import argparse
 import logging
-import os
+from typing import Any
+from typing import Dict
 
-import psycopg2
 from dotenv import load_dotenv
 from flask import Flask
 from flask import jsonify
 from flask import render_template
 from flask import request
 
+from db import get_conn
+from db import init as init_db
+from db import insert_debug_record
+
+# -------------------------------------------------------------------------
+# Logging & env
+# -------------------------------------------------------------------------
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+
+# -------------------------------------------------------------------------
+# Flask setup
+# -------------------------------------------------------------------------
+
+
 app = Flask(__name__)
 
 
-DATABASE_URL = os.getenv("DB_URL")
-logger.info(f"DATABASE_URL: {DATABASE_URL}")
-
-
-def init_db():
-    try:
-        logger.info("Attempting database connection...")
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS debug_data (
-                id SERIAL PRIMARY KEY,
-                ip TEXT,
-                browser_info TEXT,
-                performance_data TEXT,
-                fingerprints TEXT,
-                errors TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        conn.close()
-        logger.info("Database initialization successful")
-    except psycopg2.Error as e:
-        logger.error(f"Database connection failed: {e}")
-        raise
+# -------------------------------------------------------------------------
+# Routes
+# -------------------------------------------------------------------------
 
 
 @app.route("/")
@@ -51,67 +51,54 @@ def index():
 
 
 @app.route("/collect", methods=["POST"])
-def collect():
+def collect() -> tuple[dict[str, Any], int]:
     try:
-        data = request.get_json()
-        debug_info = {
-            "ip": request.remote_addr,
-            "browser": data.get("browser", {}),
-            "performance": data.get("performance", {}),
-            "fingerprints": data.get("fingerprints", {}),
-            "errors": data.get("errors", []),
-            "timestamp": data.get("timestamp"),
-        }
+        data: Dict[str, Any] = request.get_json(force=True) or {}
 
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO debug_data (
-                ip, 
-                browser_info, 
-                performance_data, 
-                fingerprints, 
-                errors
-            ) VALUES (
-                %s, %s, %s, %s, %s
-            )""",
-            (
-                debug_info["ip"],
-                str(debug_info["browser"]),
-                str(debug_info["performance"]),
-                str(debug_info["fingerprints"]),
-                str(debug_info["errors"]),
-            ),
+        insert_debug_record(
+            ip=request.remote_addr or "",  # may be None in CLI tests
+            browser_info=data.get("browser", {}),
+            performance_data=data.get("performance", {}),
+            fingerprints=data.get("fingerprints", {}),
+            errors=data.get("errors", []),
         )
-        conn.commit()
-        conn.close()
 
-        return jsonify(debug_info), 200
-    except Exception as e:
-        print(f"Error: {e}")
+        return jsonify({"status": "ok"}), 200
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("Error while handling /collect: %s", exc)
         return jsonify({"message": "Internal Server Error"}), 500
 
 
 @app.route("/health")
-def health():
+def health() -> tuple[dict[str, str], int]:
     try:
-        # Test database connection
-        conn = psycopg2.connect(DATABASE_URL)
-        conn.close()
+        # Simple connection test
+        with get_conn():
+            pass
         return jsonify({"status": "healthy", "database": "connected"}), 200
-    except Exception as e:
-        return jsonify({"status": "unhealthy", "database": str(e)}), 500
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Health check failed: %s", exc)
+        return jsonify({"status": "unhealthy", "database": str(exc)}), 500
 
 
-if __name__ == "__main__":
+# -------------------------------------------------------------------------
+# Entry-point
+# -------------------------------------------------------------------------
+
+
+def main() -> None:  # pragma: no cover – executed only as script
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="Host address")
     parser.add_argument("--port", type=int, default=5000, help="Port number")
-    parser.add_argument("--skip-db", action="store_true", help="Skip database initialization")
+    parser.add_argument("--skip-db", action="store_true", help="Skip database initialisation")
 
     args = parser.parse_args()
 
     if not args.skip_db:
         init_db()
+
     app.run(host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

@@ -298,6 +298,87 @@ const ui = {
         });
     },
 
+    // ------------------------------------------------------------------
+    // HTTP Waterfall chart (horizontal stacked bar)
+    // ------------------------------------------------------------------
+    displayWaterfallChart(data) {
+        const canvasEl = document.getElementById('waterfallChart');
+        if (!canvasEl) return;
+
+        const resources = data.performance.resources
+            .filter(r => r.duration && r.name.startsWith('http'))
+            .sort((a, b) => b.duration - a.duration)
+            .slice(0, 15); // top 15 by duration
+
+        if (!resources.length) {
+            canvasEl.parentElement.innerHTML = '<p>No resource timing entries available.</p>';
+            return;
+        }
+
+        const labels = resources.map(r => r.name.split('/').pop().split('?')[0]);
+
+        // Offset is startTime, Transfer is duration.
+        const offsets = resources.map(r => Math.round(r.startTime));
+        const transfers = resources.map(r => Math.round(r.duration));
+
+        const ctx = canvasEl.getContext('2d');
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Start offset',
+                        data: offsets,
+                        backgroundColor: 'rgba(0,0,0,0)', // transparent
+                        borderWidth: 0,
+                        stack: 'combined',
+                    },
+                    {
+                        label: 'Transfer',
+                        data: transfers,
+                        backgroundColor: 'rgba(45, 136, 255, 0.7)',
+                        borderColor: 'rgba(45,136,255,1)',
+                        stack: 'combined',
+                    },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#e0e0e0' },
+                        title: { display: true, text: 'ms', color: '#e0e0e0' },
+                    },
+                    y: {
+                        stacked: true,
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#e0e0e0' },
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            // Show nicer tooltip: offset + transfer
+                            label(ctx) {
+                                const label = ctx.dataset.label;
+                                const value = ctx.parsed.x;
+                                return `${label}: ${value} ms`;
+                            },
+                        },
+                    },
+                    legend: {
+                        labels: { color: '#e0e0e0' },
+                    },
+                },
+            },
+        });
+    },
+
     displayFingerprints(data) {
         // Canvas Fingerprint
         const canvasDiv = document.getElementById('canvasFingerprint');
@@ -420,6 +501,7 @@ async function collectData() {
     ui.displayPerformanceChart(data);
     ui.displayFingerprints(data);
     ui.displayWebVitals(data);
+    ui.displayWaterfallChart(data);
     ui.displayDebugInfo(data);
 
     setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);

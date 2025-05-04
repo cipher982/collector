@@ -101,9 +101,17 @@
             <div class="tab-buttons">
                 <button class="tab-button active" data-tab="overview">Overview</button>
                 <button class="tab-button" data-tab="performance">Performance</button>
+                <button class="tab-button" data-tab="waterfall">Waterfall</button>
                 <button class="tab-button" data-tab="vitals">Vitals</button>
                 <button class="tab-button" data-tab="fingerprint">Fingerprint</button>
                 <button class="tab-button" data-tab="raw">Raw Data</button>
+            </div>
+
+            <!-- Waterfall tab -->
+            <div id="waterfall" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="waterfallChart"></canvas>
+                </div>
             </div>
 
             <!-- Core Web Vitals tab -->

@@ -8,7 +8,6 @@ not available or when --skip-e2e flag is used.
 from __future__ import annotations
 
 import json
-import time
 
 import pytest
 
@@ -36,17 +35,23 @@ def test_capture_roundtrip(_flask_server, browser):
     page = context.new_page()
     page.route("**/collect", _handle)
 
-    page.goto(_flask_server)
+    # Use Playwright's wait helper which is more reliable than manual poll.
+    with page.expect_request("**/collect", timeout=20000) as req_info:  # 20-s ceiling
+        page.goto(_flask_server)
 
-    # Wait up to 6 seconds for collector to fire (CONFIG.COLLECTION_DELAY = 3s)
-    for _ in range(60):
-        if payload_holder:
-            break
-        time.sleep(0.1)
+    req = req_info.value
+
+    # If our own route handler captured body use that (avoids double-parsing),
+    # otherwise fall back to Playwright's helper.
+    if "body" in payload_holder:
+        payload = payload_holder["body"]
     else:
-        pytest.fail("No /collect request captured")
-
-    payload = payload_holder["body"]
+        try:
+            payload = req.post_data_json  # playwright may expose as property
+        except AttributeError:
+            payload = None
+        if not payload:
+            payload = json.loads(req.post_data or "{}")
 
     # Keys that should always be present
     for key in [

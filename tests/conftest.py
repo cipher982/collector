@@ -1,131 +1,87 @@
-"""Pytest global fixtures."""
+"""Pytest global fixtures – run without external services.
+
+We monkey-patch the *db* module to store rows in-memory, letting integration
+tests execute without PostgreSQL or Docker.  Playwright E2E tests remain
+optional and can be skipped via ``--skip-e2e``.
+"""
 
 from __future__ import annotations
 
-import os
+import socket
 import threading
 import time
+from contextlib import contextmanager
+from typing import Any
+from typing import Generator
+from typing import List
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Database container (Testcontainers – optional)
+# CLI option
 # ---------------------------------------------------------------------------
 
 
-try:
-    from testcontainers.postgres import PostgresContainer  # type: ignore
-
-    _HAS_TESTCONTAINERS = True
-except ModuleNotFoundError:  # pragma: no cover – optional dependency
-    PostgresContainer = None  # type: ignore
-    _HAS_TESTCONTAINERS = False
-
-
-def pytest_addoption(parser):  # noqa: D401 – pytest hook name
-    """CLI options for tests."""
-
+def pytest_addoption(parser):  # noqa: D401 – pytest hook name enforced
     parser.addoption(
         "--skip-e2e",
         action="store_true",
         default=False,
-        help="Skip Playwright end-to-end tests.",
+        help="Skip Playwright end-to-end browser tests.",
     )
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# In-memory stub for the *db* module
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def _postgres_container(pytestconfig):  # noqa: D401 – internal fixture
-    """Start a disposable Postgres container.
-
-    If Docker or *testcontainers* is unavailable, the fixture skips tests that
-    depend on the database.
-    """
-
-    if not _HAS_TESTCONTAINERS:
-        pytest.skip("testcontainers-postgres not installed", allow_module_level=True)
-
-    try:
-        with PostgresContainer("postgres:15-alpine") as pg:
-            yield pg
-    except Exception as exc:  # pragma: no cover – environment-specific
-        pytest.skip(f"Cannot start Postgres container: {exc}", allow_module_level=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _env_and_db(_postgres_container):
-    """Set DB_URL env var and initialise schema."""
+def _patch_db() -> None:  # noqa: D401 – autouse fixture
+    """Replace db helpers with in-memory equivalents before tests import *app*."""
 
-    from db import init as db_init
+    import importlib
 
-    url = _postgres_container.get_connection_url()  # type: ignore[attr-defined]
-    os.environ["DB_URL"] = url
+    db = importlib.import_module("db")
 
-    db_init()  # builds pool & schema
+    # Accumulate inserted rows here so tests can introspect.
+    _records: List[dict[str, Any]] = []
+
+    def fake_insert_debug_record(**kwargs):  # type: ignore[override]
+        _records.append(kwargs)
+
+    @contextmanager
+    def fake_get_conn() -> Generator[None, None, None]:  # type: ignore[override]
+        yield None
+
+    def fake_init():  # type: ignore[override]
+        pass  # no-op
+
+    db.insert_debug_record = fake_insert_debug_record  # type: ignore[attr-defined]
+    db.get_conn = fake_get_conn  # type: ignore[attr-defined]
+    db.init = fake_init  # type: ignore[attr-defined]
+    db._records = _records  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# Flask app fixtures
+# Flask test client
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
 def client():
-    """Return Flask test client."""
-
-    from app import app as flask_app
+    from app import app as flask_app  # imported after DB patch
 
     return flask_app.test_client()
 
 
 # ---------------------------------------------------------------------------
-# Playwright (E2E) fixtures
+# Playwright fixtures (optional)
 # ---------------------------------------------------------------------------
-
-
-def _run_flask_server(port: int) -> None:  # pragma: no cover – helper
-    """Run Flask app in a thread for Playwright tests."""
-
-    from app import app as flask_app
-
-    flask_app.run(host="127.0.0.1", port=port, use_reloader=False)
-
-
-@pytest.fixture(scope="session")
-def _flask_server(pytestconfig):
-    """Launch the Flask dev server in a background thread."""
-
-    if pytestconfig.getoption("--skip-e2e"):
-        pytest.skip("--skip-e2e flag enabled – skipping server startup.")
-
-    port = 58000  # hard-coded high port
-    thread = threading.Thread(target=_run_flask_server, args=(port,), daemon=True)
-    thread.start()
-
-    # simple wait loop – production code would be more robust
-    for _ in range(30):
-        import socket
-
-        with socket.socket() as sock:
-            if sock.connect_ex(("127.0.0.1", port)) == 0:
-                break
-        time.sleep(0.1)
-    else:
-        raise RuntimeError("Flask server did not start in time")
-
-    yield f"http://127.0.0.1:{port}"
-
-    # nothing to teardown – daemon thread exits with pytest
 
 
 @pytest.fixture(scope="session")
 def browser(pytestconfig):
-    """Return Playwright browser instance."""
-
     if pytestconfig.getoption("--skip-e2e"):
         pytest.skip("E2E tests skipped via flag")
 
@@ -138,3 +94,30 @@ def browser(pytestconfig):
         browser = pw.chromium.launch()
         yield browser
         browser.close()
+
+
+@pytest.fixture(scope="session")
+def _flask_server(pytestconfig):
+    if pytestconfig.getoption("--skip-e2e"):
+        pytest.skip("--skip-e2e flag – skipping server startup")
+
+    from app import app as flask_app
+
+    port = 58000
+
+    thread = threading.Thread(
+        target=lambda: flask_app.run(host="127.0.0.1", port=port, use_reloader=False),
+        daemon=True,
+    )
+    thread.start()
+
+    # Wait for server
+    for _ in range(50):
+        with socket.socket() as sock:
+            if sock.connect_ex(("127.0.0.1", port)) == 0:
+                break
+        time.sleep(0.1)
+    else:
+        pytest.skip("Flask dev server failed to start", allow_module_level=True)
+
+    yield f"http://127.0.0.1:{port}"

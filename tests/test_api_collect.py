@@ -1,24 +1,16 @@
-"""Integration tests for /collect endpoint."""
+"""Integration test using the in-memory stubbed DB."""
 
 from __future__ import annotations
 
-from db import get_conn
+import db  # the patched instance with _records list  # type: ignore
 from tests.factories import sample_payload
 
 
-def _row_count() -> int:
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM debug_data")
-            (cnt,) = cur.fetchone()
-            return cnt
-
-
-def test_collect_inserts_row(client):
-    before = _row_count()
+def test_collect_inserts_record(client):
+    before = len(db._records)  # type: ignore[attr-defined]
 
     resp = client.post("/collect", json=sample_payload())
     assert resp.status_code == 200
 
-    after = _row_count()
+    after = len(db._records)  # type: ignore[attr-defined]
     assert after == before + 1

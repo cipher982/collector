@@ -172,7 +172,18 @@ def main() -> None:  # pragma: no cover – executed only as script
         init_db()
 
     # Run via Socket.IO so WebSocket endpoint is active.
-    socketio.run(app, host=args.host, port=args.port)
+    # Flask-SocketIO 5.x disallows the use of the built-in Werkzeug dev server
+    # in *production* unless the caller explicitly opts-in.  We pass
+    # ``allow_unsafe_werkzeug=True`` so that *local* runs continue to work
+    # (`python app.py`).  When the application is started under Gunicorn (the
+    # recommended production path used in the Dockerfile) this block is not
+    # executed, so the flag never comes into play.
+    socketio.run(
+        app,
+        host=args.host,
+        port=args.port,
+        allow_unsafe_werkzeug=True,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

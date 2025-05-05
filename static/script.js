@@ -682,6 +682,71 @@ const ui = {
     },
 
     // ------------------------------------------------------------------
+    // Live WebGL demo (rotating cube + FPS counter)
+    // ------------------------------------------------------------------
+    startGpuDemo() {
+        // Ensure container and Three.js are available
+        const container = document.getElementById('gpuDemoContainer');
+        if (!container || typeof THREE === 'undefined') return;
+
+        // Prepare renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const dpr = window.devicePixelRatio || 1;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(width, height);
+        renderer.setClearColor(0x202020);
+        container.appendChild(renderer.domElement);
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+        camera.position.z = 3;
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(3, 5, 2);
+        scene.add(dirLight);
+
+        // Geometry – colourful cube
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x44aaff,
+            metalness: 0.1,
+            roughness: 0.8,
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        // FPS tracking
+        const fpsEl = document.getElementById('fpsValue');
+        let frames = 0;
+        let lastFpsTime = performance.now();
+
+        const animate = (time) => {
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.013;
+
+            renderer.render(scene, camera);
+
+            frames += 1;
+            const delta = time - lastFpsTime;
+            if (delta >= 1000) {
+                const fps = (frames * 1000) / delta;
+                if (fpsEl) fpsEl.textContent = fps.toFixed(0);
+                frames = 0;
+                lastFpsTime = time;
+            }
+
+            requestAnimationFrame(animate);
+        };
+
+        requestAnimationFrame(animate);
+    },
+
+    // ------------------------------------------------------------------
     // Live timeline initialisation – returns Chart instance
     // ------------------------------------------------------------------
     initializeTimeline() {
@@ -837,6 +902,7 @@ async function collectData() {
 window.onload = () => {
     collectData();
     initializeLiveUpdates();
+    ui.startGpuDemo?.();
 };
 
 // ------------------------------------------------------------------

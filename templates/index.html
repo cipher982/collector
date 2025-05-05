@@ -9,6 +9,8 @@
 
     <!-- 3rd-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Three.js for live GPU demo -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" defer></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" defer></script>
     <script src="https://unpkg.com/web-vitals@3/dist/web-vitals.iife.min.js" defer></script>
 
@@ -16,9 +18,9 @@
     <style>
         /* General theming -------------------------------------------------- */
         body {
-            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            max-width: 1400px; /* expand a bit so content breathes less white-space on large monitors */
             background-color: #1a1a1a;
             color: #e0e0e0;
         }
@@ -72,6 +74,23 @@
         /* Responsive tweak: single column on small screens */
         @media (max-width: 768px) {
             .two-col { grid-template-columns: 1fr; }
+        }
+
+        /* Hide element visually but keep for screen-readers */
+        .visually-hidden {
+            position: absolute !important;
+            width: 1px; height: 1px; margin: -1px; border: 0; padding: 0;
+            overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+            white-space: nowrap; /* prevent wrap */
+        }
+
+        /* GPU demo card: overlay title bottom-right to save vertical space */
+        #gpuDemoContainer::after {
+            content: 'Live GPU Demo';
+            position: absolute; bottom: 8px; right: 8px;
+            font-weight: bold; font-size: 0.9rem; color: #fff;
+            text-shadow: 0 0 4px #000;
+            pointer-events: none;
         }
 
         /* Status indicator chips */
@@ -142,10 +161,31 @@
     <!-- -----------------------------------------------------------------
          GPU Benchmarks (baseline FPS, GPU timer, texture extensions)
     ------------------------------------------------------------------ -->
-    <section id="gpuBench">
-        <h2>GPU Benchmarks (preview)</h2>
-        <article class="metric-card">
-            <div id="gpuBenchResults">Running…</div>
+    <!-- Display summary + live demo side-by-side on larger screens to avoid
+         excessive vertical stacking. The existing `.two-col` grid helper is
+         reused; on narrow viewports it automatically collapses to a single
+         column. -->
+    <section id="gpuBench" class="two-col" style="align-items: stretch;">
+        <h2 style="grid-column:1 / -1;">GPU Benchmarks (preview)</h2>
+
+        <!-- Summary ------------------------------------------------------- -->
+        <article class="metric-card" style="min-width:220px; display:flex; flex-direction:column; justify-content:center;">
+            <div id="gpuBenchResults" style="line-height:1.5;">Running…</div>
+        </article>
+
+        <!-- Live WebGL demo ---------------------------------------------- -->
+        <article class="metric-card" id="gpuDemoCard" style="position:relative; overflow:hidden;">
+            <!-- Heading is kept for accessibility but hidden visually.  The
+                 visible label is injected via CSS so it doesn’t consume extra
+                 vertical real-estate. -->
+            <h3 class="visually-hidden">Live GPU Demo</h3>
+
+            <div id="gpuDemoContainer" style="width:100%; max-height:220px; aspect-ratio:16/9; position:relative;">
+                <!-- FPS counter (top-left) -->
+                <div id="fpsDisplay" style="position:absolute; top:8px; left:8px; color:#fff; font-weight:bold; text-shadow:0 0 4px #000; pointer-events:none; font-size:0.9rem;">
+                    FPS: <span id="fpsValue">–</span>
+                </div>
+            </div>
         </article>
     </section>
 

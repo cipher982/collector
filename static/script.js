@@ -184,29 +184,21 @@ const collectors = {
 
 // Enhanced UI handling
 const ui = {
-    initializeTabs() {
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                button.classList.add('active');
-                document.getElementById(button.dataset.tab).classList.add('active');
-            });
-        });
-    },
 
     displaySystemStatus(data) {
         const statusDiv = document.getElementById('systemStatus');
+        const mem = data.browser.deviceMemory;
         const items = [
             { label: 'Online', value: data.browser.onLine ? 'Yes' : 'No', good: data.browser.onLine },
             { label: 'Cookies', value: data.browser.cookiesEnabled ? 'Enabled' : 'Disabled', good: data.browser.cookiesEnabled },
             { label: 'DNT', value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
-            { label: 'Memory', value: `${data.browser.deviceMemory}GB`, good: data.browser.deviceMemory > 4 }
+            { label: 'Memory', value: typeof mem === 'number' ? `${mem} GB` : 'n/a', good: typeof mem === 'number' ? mem > 4 : true }
         ];
 
         // Network chip (if available)
         if (data.network && Object.keys(data.network).length) {
-            const netLabel = `${data.network.effectiveType?.toUpperCase() || 'Net'} • ${data.network.rtt ?? '?'} ms RTT`;
+            const rtt = typeof data.network.rtt === 'number' ? `${data.network.rtt} ms RTT` : 'RTT n/a';
+            const netLabel = `${data.network.effectiveType?.toUpperCase() || 'NET'} • ${rtt}`;
             items.unshift({ label: 'Network', value: netLabel, good: data.network.rtt && data.network.rtt < 150 });
         }
 
@@ -568,7 +560,6 @@ async function collectData() {
 
 // Initialize
 window.onload = () => {
-    ui.initializeTabs();
     collectData();
     initializeLiveUpdates();
 };

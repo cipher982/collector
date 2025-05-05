@@ -3,12 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <title>Browser Fingerprinting Demo</title>
+
+    <!-- Pico.css base styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+
+    <!-- 3rd-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" defer></script>
-    <!-- Small 2kB RUM helper for Core Web Vitals -->
     <script src="https://unpkg.com/web-vitals@3/dist/web-vitals.iife.min.js" defer></script>
+
+    <!-- Minimal dashboard-specific layout helpers -->
     <style>
+        /* General theming -------------------------------------------------- */
         body {
             max-width: 1200px;
             margin: 0 auto;
@@ -16,51 +22,13 @@
             background-color: #1a1a1a;
             color: #e0e0e0;
         }
-        .loading {
-            color: #a0a0a0;
-            font-style: italic;
-        }
-        .tab-container {
-            margin: 20px 0;
-        }
-        .tab-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .tab-button {
-            padding: 10px 20px;
-            border: none;
-            background: #2d2d2d;
-            color: #e0e0e0;
-            cursor: pointer;
-        }
-        .tab-button.active {
-            background: #0056b3;
-            color: white;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-good {
-            background-color: #2ecc71;
-        }
-        .status-warning {
-            background-color: #f1c40f;
-        }
-        .status-error {
-            background-color: #e74c3c;
-        }
+
+        h1, h2, h3 { color: #ffffff; }
+        strong       { color: #ffffff; }
+
+        .loading { color: #a0a0a0; font-style: italic; }
+
+        /* Legacy card / chart styles reused by JS ------------------------- */
         .metric-card {
             background: #2d2d2d;
             padding: 15px;
@@ -68,6 +36,7 @@
             margin-bottom: 15px;
             border: 1px solid #404040;
         }
+
         .chart-container {
             height: 300px;
             margin: 20px 0;
@@ -76,101 +45,158 @@
             border-radius: 8px;
             border: 1px solid #404040;
         }
+
+        .full-width { width: 100%; }
+
         pre {
             background: #2d2d2d;
             padding: 15px;
             border-radius: 8px;
-            color: #e0e0e0;
             border: 1px solid #404040;
+            color: #e0e0e0;
         }
-        h1, h3 {
-            color: #ffffff;
+
+        /* New layout helpers ---------------------------------------------- */
+        .hero {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
-        strong {
-            color: #ffffff;
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        /* Responsive tweak: single column on small screens */
+        @media (max-width: 768px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+
+        /* Status indicator chips */
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-good    { background-color: #2ecc71; }
+        .status-warning { background-color: #f1c40f; }
+        .status-error   { background-color: #e74c3c; }
+
+        /* Core Web Vitals micro-cards */
+        #coreVitals {
+            display: flex;
+            flex-direction: column; /* stack vertically */
+            gap: 0.4rem;
+        }
+
+        #coreVitals .metric-card {
+            padding: 10px;
+            margin: 0;
         }
     </style>
 </head>
+
 <body>
+    <!-- -----------------------------------------------------------------
+         Header
+    ------------------------------------------------------------------ -->
     <header>
         <h1>Browser Fingerprinting Demo</h1>
         <p>Real-time browser fingerprinting metrics and system information dashboard.</p>
     </header>
 
-    <main>
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" data-tab="overview">Overview</button>
-                <button class="tab-button" data-tab="performance">Performance</button>
-                <button class="tab-button" data-tab="waterfall">Waterfall</button>
-                <button class="tab-button" data-tab="timeline">Timeline</button>
-                <button class="tab-button" data-tab="vitals">Vitals</button>
-                <button class="tab-button" data-tab="fingerprint">Fingerprint</button>
-                <button class="tab-button" data-tab="raw">Raw Data</button>
-            </div>
+    <!-- -----------------------------------------------------------------
+         Hero section – status chips + Core Web Vitals cards
+    ------------------------------------------------------------------ -->
+    <section id="status" class="hero">
+        <!-- System status chips -->
+        <article class="metric-card" style="flex:2 1 320px; min-width:280px;">
+            <h3>System Status</h3>
+            <div id="systemStatus"></div>
+        </article>
 
-            <!-- Waterfall tab -->
-            <div id="waterfall" class="tab-content">
-                <div class="chart-container">
-                    <canvas id="waterfallChart"></canvas>
-                </div>
-            </div>
+        <!-- Browser / device context -->
+        <article class="metric-card" style="flex:1 1 260px; min-width:220px;">
+            <h3>Browser & Device</h3>
+            <div id="browserInfo"></div>
+        </article>
 
-            <!-- Live Timeline tab -->
-            <div id="timeline" class="tab-content">
-                <div class="chart-container">
-                    <canvas id="timelineChart"></canvas>
-                </div>
-            </div>
+        <!-- Core Web Vitals cards -->
+        <article class="metric-card" style="flex:1 1 260px; min-width:220px;">
+            <h3>Core Web Vitals</h3>
+            <div id="coreVitals" class="grid"></div>
+        </article>
+    </section>
 
-            <!-- Core Web Vitals tab -->
-            <div id="vitals" class="tab-content">
-                <div class="grid" id="coreVitals"></div>
-            </div>
-
-            <div id="overview" class="tab-content active">
-                <div class="grid">
-                    <div class="metric-card">
-                        <h3>System Status</h3>
-                        <div id="systemStatus"></div>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Browser Information</h3>
-                        <div id="browserInfo"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="performance" class="tab-content">
-                <div class="chart-container">
-                    <canvas id="performanceChart"></canvas>
-                </div>
-                <div id="performanceMetrics"></div>
-            </div>
-
-            <div id="fingerprint" class="tab-content">
-                <div class="grid">
-                    <div class="metric-card">
-                        <h3>Canvas Fingerprint</h3>
-                        <div id="canvasFingerprint"></div>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Fonts Available</h3>
-                        <div id="fontFingerprint"></div>
-                    </div>
-                    <div class="metric-card">
-                        <h3>WebGL Information</h3>
-                        <div id="webglInfo"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="raw" class="tab-content">
-                <pre id="debugOutput" class="loading">Collecting data...</pre>
+    <!-- -----------------------------------------------------------------
+         Performance block – bar & waterfall charts
+    ------------------------------------------------------------------ -->
+    <section id="performance" class="two-col">
+        <div>
+            <h2>Top resources</h2>
+            <div class="chart-container">
+                <canvas id="performanceChart" class="full-width"></canvas>
             </div>
         </div>
-    </main>
 
+        <div>
+            <h2>Waterfall</h2>
+            <div class="chart-container">
+                <canvas id="waterfallChart" class="full-width"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- -----------------------------------------------------------------
+         Live timeline
+    ------------------------------------------------------------------ -->
+    <section id="timeline">
+        <h2>Live timeline</h2>
+        <div class="chart-container">
+            <canvas id="timelineChart" class="full-width"></canvas>
+        </div>
+    </section>
+
+
+
+    <!-- -----------------------------------------------------------------
+         Fingerprinting details
+    ------------------------------------------------------------------ -->
+    <section id="fingerprint" class="grid">
+        <article class="metric-card">
+            <h3>Canvas Fingerprint</h3>
+            <div id="canvasFingerprint"></div>
+        </article>
+
+        <article class="metric-card">
+            <h3>Fonts Available</h3>
+            <div id="fontFingerprint"></div>
+        </article>
+
+        <article class="metric-card">
+            <h3>WebGL Information</h3>
+            <div id="webglInfo"></div>
+        </article>
+    </section>
+
+    <!-- -----------------------------------------------------------------
+         Raw JSON (collapsed by default using <details>)
+    ------------------------------------------------------------------ -->
+    <section id="raw">
+        <h2>Raw payload</h2>
+        <details>
+            <summary>Show / hide debug JSON</summary>
+            <pre id="debugOutput" class="loading">Collecting data...</pre>
+        </details>
+    </section>
+
+    <!-- -----------------------------------------------------------------
+         Scripts
+    ------------------------------------------------------------------ -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

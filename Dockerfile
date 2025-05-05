@@ -19,15 +19,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
 # process.  Two workers are usually enough for small containers; tune as
 # needed via docker-compose overrides or env vars.
 
-CMD [
-    "uv",
-    "run",
-    "gunicorn",
-    "-k",
-    "geventwebsocket.gunicorn.workers.GeventWebSocketWorker",
-    "-w",
-    "2",
-    "-b",
-    "0.0.0.0:5000",
-    "app:app"
-]
+CMD ["uv", "run", "gunicorn", "-k", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]

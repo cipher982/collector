@@ -229,11 +229,30 @@ const ui = {
     displaySystemStatus(data) {
         const statusDiv = document.getElementById('systemStatus');
         const mem = data.browser.deviceMemory;
+
+        // If the maximum bucket (8) is returned, append a '+' and note.
+        let memLabel = 'n/a';
+        if (typeof mem === 'number') {
+            const capped = mem >= 8; // spec-mandated upper bucket
+            memLabel = `${mem}${capped ? '+' : ''} GB${capped ? ' (browser-capped)' : ''}`;
+        }
+
+        // Show explanatory foot-note when browser returns the maximum bucket.
+        const memoryNoteEl = document.getElementById('memoryNote');
+        if (memoryNoteEl) {
+            if (typeof mem === 'number' && mem >= 8) {
+                memoryNoteEl.textContent = 'Browsers cap navigator.deviceMemory at 8 GB for privacy. Actual RAM may be higher.';
+                memoryNoteEl.style.display = 'block';
+            } else {
+                memoryNoteEl.style.display = 'none';
+            }
+        }
+
         const items = [
-            { label: 'Online', value: data.browser.onLine ? 'Yes' : 'No', good: data.browser.onLine },
+            { label: 'Online', value: data.browser.onLine ? 'Yes' : 'No',        good: data.browser.onLine },
             { label: 'Cookies', value: data.browser.cookiesEnabled ? 'Enabled' : 'Disabled', good: data.browser.cookiesEnabled },
-            { label: 'DNT', value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
-            { label: 'Memory', value: typeof mem === 'number' ? `${mem} GB` : 'n/a', good: typeof mem === 'number' ? mem > 4 : true }
+            { label: 'DNT',     value: data.browser.doNotTrack === "1" ? "Enabled" : "Disabled", good: true },
+            { label: 'Memory',  value: memLabel, good: typeof mem === 'number' ? mem > 4 : true }
         ];
 
         // Network chip – prefer actively measured numbers if present

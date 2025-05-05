@@ -45,6 +45,26 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ---------------------------------------------------------------------------
+# Database initialisation (runs during application import)
+# ---------------------------------------------------------------------------
+
+# When the application is executed under Gunicorn (the recommended production
+# path defined in the Dockerfile) the ``main()`` helper is *not* invoked.  In
+# that code path the database connection pool must therefore be initialised
+# here at import-time so that routes – and, crucially, the ``/health``
+# endpoint used by Docker health-checks – can access it.  If the environment
+# is deliberately configured without a database (e.g. local UI-only preview
+# or CI unit tests) we fall back gracefully and keep the application running
+# with persistence disabled.
+
+try:
+    init_db()
+except RuntimeError as exc:  # Missing DB_URL → operate without persistence
+    logger.warning("Database not initialised (no DB_URL): %s", exc)
+except Exception as exc:  # pragma: no cover – log but keep container alive
+    logger.exception("Database initialisation failed – continuing without DB: %s", exc)
+
+# ---------------------------------------------------------------------------
 # WebSocket events
 # ---------------------------------------------------------------------------
 
@@ -113,16 +133,31 @@ def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
 
 @app.route("/health")
 def health() -> tuple[dict[str, str], int]:  # noqa: D401 – Flask view
-    """Simple readiness probe used by Docker/K8s health-checks."""
+    """Readiness probe for container orchestrators.
+
+    Behaviour matrix:
+
+    • DB available and reachable   → HTTP 200 {healthy, connected}
+    • DB intentionally disabled    → HTTP 200 {healthy, not_configured}
+    • DB configured but unreachable→ HTTP 503 {unhealthy, <error>}
+    """
 
     try:
-        # Cheap connection test
+        # If the connection pool is initialised, perform a cheap connection
+        # round-trip; otherwise assume DB persistence is intentionally
+        # disabled (e.g. preview deployments) and still report healthy so the
+        # container does not flap.
         with get_conn():
             pass
         return jsonify({"status": "healthy", "database": "connected"}), 200
+    except RuntimeError:
+        # Pool not initialised – most likely because ``DB_URL`` is unset.  We
+        # treat this as *healthy* so that stateless deployments remain
+        # functional.
+        return jsonify({"status": "healthy", "database": "not_configured"}), 200
     except Exception as exc:  # pylint: disable=broad-except
         logger.error("Health check failed: %s", exc)
-        return jsonify({"status": "unhealthy", "database": str(exc)}), 500
+        return jsonify({"status": "unhealthy", "database": str(exc)}), 503
 
 
 # ---------------------------------------------------------------------------

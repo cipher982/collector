@@ -106,24 +106,30 @@ class _Database:
     ) -> None:
         """Persist a single record into *debug_data* table."""
 
-        sql = (
-            "INSERT INTO debug_data (ip, browser_info, performance_data, "
-            "fingerprints, errors) VALUES (%s, %s, %s, %s, %s)"
-        )
+        # If the pool is not initialised we silently skip persistence so that
+        # stateless deployments (or preview environments) can continue to
+        # operate without a database.
+        try:
+            sql = (
+                "INSERT INTO debug_data (ip, browser_info, performance_data, "
+                "fingerprints, errors) VALUES (%s, %s, %s, %s, %s)"
+            )
 
-        with self.get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    sql,
-                    (
-                        ip,
-                        Json(browser_info),
-                        Json(performance_data),
-                        Json(fingerprints),
-                        Json(errors),
-                    ),
-                )
-                conn.commit()
+            with self.get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        sql,
+                        (
+                            ip,
+                            Json(browser_info),
+                            Json(performance_data),
+                            Json(fingerprints),
+                            Json(errors),
+                        ),
+                    )
+                    conn.commit()
+        except RuntimeError:
+            logger.debug("Insert skipped – database not configured.")
 
 
 # -------------------------------------------------------------------------

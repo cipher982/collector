@@ -637,7 +637,9 @@ function initializeLiveUpdates() {
     // Ensure client library is present
     if (typeof io === 'undefined') return;
 
-    const socket = io(); // connects to same host/port automatically
+    // Reuse a single Socket.IO instance for the whole page so widgets can share it.
+    const socket = window.sharedSocket || io(); // connects to same host/port automatically
+    window.sharedSocket = socket;
     const timelineChart = ui.initializeTimeline();
     if (!timelineChart) return;
 

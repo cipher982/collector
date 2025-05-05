@@ -117,6 +117,9 @@
         <article class="metric-card" style="flex:2 1 320px; min-width:280px;">
             <h3>System Status</h3>
             <div id="systemStatus"></div>
+
+            <!-- Live latency equalizer (Web Component) -->
+            <ping-eq id="pingBars" mode="socket" width="60" interval="1000"></ping-eq>
         </article>
 
         <!-- Browser / device context -->
@@ -198,5 +201,7 @@
          Scripts
     ------------------------------------------------------------------ -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <!-- WebComponent equalizer module -->
+    <script type="module" src="{{ url_for('static', filename='ping-eq.js') }}"></script>
 </body>
 </html>

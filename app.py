@@ -44,6 +44,22 @@ app = Flask(__name__)
 # Thread-based async mode works out-of-the-box (no eventlet/gevent needed)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
+# ---------------------------------------------------------------------------
+# WebSocket events
+# ---------------------------------------------------------------------------
+
+
+@socketio.on("latency_check")
+def _latency_check(ts):  # type: ignore[valid-type]
+    """Round-trip latency probe – simply ack back the received timestamp.
+
+    The client emits `socket.emit('latency_check', Date.now(), ack)` and we call
+    the acknowledgement with the *same* timestamp.  The client then measures
+    `Date.now() - ts` to estimate RTT without issuing extra HTTP requests.
+    """
+
+    return ts
+
 
 def _socket_emit(event: str, data) -> None:  # noqa: D401 – thin wrapper
     """Emit *event* with *data* through the singleton Socket.IO instance."""

@@ -4,6 +4,17 @@ const CONFIG = {
     ENDPOINT: "/collect"
 };
 
+// WebGL compressed texture extensions we probe for – kept at module scope to avoid
+// re-allocating the same array every call.
+const TEXTURE_EXT_NAMES = [
+    'EXT_texture_compression_bptc',
+    'WEBGL_compressed_texture_astc',
+    'WEBGL_compressed_texture_s3tc',
+    'WEBGL_compressed_texture_etc',
+    'WEBGL_compressed_texture_etc1',
+    'WEBGL_compressed_texture_pvrtc',
+];
+
 // Data collectors
 const collectors = {
     // Browser Information
@@ -220,6 +231,116 @@ const collectors = {
                 done();
             });
         });
+    },
+
+    // ------------------------------------------------------------------
+    // GPU micro-benchmarks (baseline FPS, GPU timer query, texture support)
+    // ------------------------------------------------------------------
+
+    async runBaselineFps(durationMs = 1200) {
+        // Lightweight FPS probe that keeps only running stats (no growing arrays)
+        return new Promise(resolve => {
+            let start;
+            let prev;
+            let sum = 0;
+            let count = 0;
+            let min = Infinity;
+            let max = 0;
+
+            const step = (ts) => {
+                if (start === undefined) {
+                    start = prev = ts;
+                    return requestAnimationFrame(step);
+                }
+
+                const fps = 1000 / (ts - prev);
+                prev = ts;
+
+                if (Number.isFinite(fps)) {
+                    sum += fps;
+                    count += 1;
+                    if (fps < min) min = fps;
+                    if (fps > max) max = fps;
+                }
+
+                if (ts - start < durationMs) {
+                    return requestAnimationFrame(step);
+                }
+
+                if (!count) {
+                    resolve({ available: false });
+                    return;
+                }
+
+                const avg = sum / count;
+                resolve({
+                    available: true,
+                    avgFps: +avg.toFixed(1),
+                    minFps: +min.toFixed(1),
+                    maxFps: +max.toFixed(1),
+                });
+            };
+
+            requestAnimationFrame(step);
+        });
+    },
+
+    async runGpuTimerQuery(timeoutMs = 250) {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        if (!gl) return { available: false };
+
+        const isWebGL2 = gl instanceof WebGL2RenderingContext;
+        const ext = gl.getExtension(isWebGL2 ? 'EXT_disjoint_timer_query_webgl2' : 'EXT_disjoint_timer_query');
+        if (!ext) return { available: false };
+
+        // helpers to hide WebGL1/2 differences
+        const createQuery = isWebGL2 ? gl.createQuery.bind(gl) : ext.createQueryEXT.bind(ext);
+        const beginQuery = isWebGL2 ? gl.beginQuery.bind(gl) : ext.beginQueryEXT.bind(ext);
+        const endQuery = isWebGL2 ? gl.endQuery.bind(gl) : ext.endQueryEXT.bind(ext);
+        const resultAvailable = (q) =>
+            isWebGL2 ? gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE) : ext.getQueryObjectEXT(q, ext.QUERY_RESULT_AVAILABLE_EXT);
+        const resultValue = (q) =>
+            isWebGL2 ? gl.getQueryParameter(q, gl.QUERY_RESULT) : ext.getQueryObjectEXT(q, ext.QUERY_RESULT_EXT);
+
+        const query = createQuery();
+        try {
+            // submit a trivial clear command – colour does not matter
+            beginQuery(ext.TIME_ELAPSED_EXT, query);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            endQuery(ext.TIME_ELAPSED_EXT);
+
+            const start = performance.now();
+            return await new Promise((res) => {
+                const poll = () => {
+                    if (performance.now() - start > timeoutMs) {
+                        res({ available: true, timeout: true });
+                        return;
+                    }
+
+                    if (!resultAvailable(query)) {
+                        return requestAnimationFrame(poll);
+                    }
+
+                    res({ available: true, gpuTimeNs: resultValue(query) });
+                };
+                poll();
+            });
+        } catch {
+            return { available: false };
+        } finally {
+            const loseCtx = gl.getExtension('WEBGL_lose_context');
+            if (loseCtx) loseCtx.loseContext();
+        }
+    },
+
+    getTextureCompressionSupport() {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return {};
+
+        return Object.fromEntries(TEXTURE_EXT_NAMES.map((n) => [n, !!gl.getExtension(n)]));
     }
 };
 
@@ -528,6 +649,39 @@ const ui = {
     },
 
     // ------------------------------------------------------------------
+    // GPU Benchmarks summary card
+    // ------------------------------------------------------------------
+    displayGpuBenchmarks(data) {
+        const container = document.getElementById('gpuBenchResults');
+        if (!container || !data?.benchmarks) return;
+
+        const { baselineFps, gpuTimer, textureSupport } = data.benchmarks;
+
+        const fpsText = baselineFps?.available
+            ? `${baselineFps.avgFps} fps (min ${baselineFps.minFps}, max ${baselineFps.maxFps})`
+            : 'n/a';
+
+        let timerText = 'unsupported';
+        if (gpuTimer?.available) {
+            timerText = gpuTimer.timeout
+                ? 'timed out'
+                : `${(gpuTimer.gpuTimeNs / 1e6).toFixed(2)} ms`;
+        }
+
+        const supportedFormats = textureSupport
+            ? Object.entries(textureSupport)
+                  .filter(([, v]) => v)
+                  .map(([k]) => k.replace(/^(EXT|WEBGL)_compressed_texture_/, ''))
+            : [];
+        const texText = supportedFormats.length ? supportedFormats.join(', ') : 'none';
+
+        container.innerHTML = `
+            <div><strong>Baseline FPS:</strong> ${fpsText}</div>
+            <div><strong>GPU Timer:</strong> ${timerText}</div>
+            <div><strong>Compressed texture formats:</strong> ${texText}</div>`;
+    },
+
+    // ------------------------------------------------------------------
     // Live timeline initialisation – returns Chart instance
     // ------------------------------------------------------------------
     initializeTimeline() {
@@ -585,6 +739,9 @@ const ui = {
             },
         });
     },
+
+    // ------------------------------------------------------------------
+    // (ui object continues below – GPU benchmark helpers belong to collectors)
 };
 
 // Data submission
@@ -604,6 +761,7 @@ async function submitData(data) {
 
 // Main collection function
 async function collectData() {
+    try {
     const errors = collectors.setupErrorTracking();
 
     const data = {
@@ -620,6 +778,24 @@ async function collectData() {
         errors
     };
 
+    // ------------------------------------------------------------------
+    // GPU micro-benchmarks (kick off async, update UI when done)
+    // ------------------------------------------------------------------
+
+    data.benchmarks = { baselineFps: { available: false }, gpuTimer: { available: false } };
+    ui.displayGpuBenchmarks(data); // show immediate placeholder
+
+    // Kick benchmarks in parallel but don't block main UI
+    Promise.all([
+        collectors.runBaselineFps(),
+        collectors.runGpuTimerQuery(),
+    ]).then(([fpsRes, gpuTimerRes]) => {
+        data.benchmarks.baselineFps = fpsRes;
+        data.benchmarks.gpuTimer = gpuTimerRes;
+        data.benchmarks.textureSupport = collectors.getTextureCompressionSupport();
+        ui.displayGpuBenchmarks(data);
+    });
+
     // Active network measurement (does 2 HTTP calls; non-blocking for UX)
     try {
         data.network.measured = await collectors.measureNetworkPerformance();
@@ -630,16 +806,31 @@ async function collectData() {
     // Capture Core Web Vitals before rendering UI; they resolve quickly
     data.performance.webVitals = await collectors.getWebVitals();
 
-    // Render UI sections
-    ui.displaySystemStatus(data);
-    ui.displayBrowserInfo(data);
-    ui.displayPerformanceChart(data);
-    ui.displayFingerprints(data);
-    ui.displayWebVitals(data);
-    ui.displayWaterfallChart(data);
-    ui.displayDebugInfo(data);
+    // Render UI sections (each guarded so a failure in one does not block others)
+    const safeCall = (fn) => {
+        try {
+            fn();
+        } catch (err) {
+            console.error('Render error:', err);
+        }
+    };
+
+    [
+        ui.displaySystemStatus,
+        ui.displayBrowserInfo,
+        ui.displayPerformanceChart,
+        ui.displayFingerprints,
+        ui.displayWebVitals,
+        ui.displayWaterfallChart,
+        ui.displayDebugInfo,
+        ui.displayGpuBenchmarks,
+    ].forEach((fn) => safeCall(() => fn(data)));
 
     setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);
+
+    } catch (err) {
+        console.error('collectData failed', err);
+    }
 }
 
 // Initialize

@@ -55,6 +55,47 @@ const collectors = {
     },
 
     // ------------------------------------------------------------------
+    // Active network performance test (latency + bandwidth)
+    // ------------------------------------------------------------------
+    async measureNetworkPerformance() {
+        const samples = 5;
+        const latencies = [];
+
+        // --- Latency (RTT) ------------------------------------------------
+        for (let i = 0; i < samples; i += 1) {
+            const start = performance.now();
+            try {
+                // Cache-bust so we always hit the server
+                await fetch(`/ping?cb=${Math.random()}`, { cache: 'no-store' });
+                latencies.push(performance.now() - start);
+            } catch {
+                latencies.push(null);
+            }
+        }
+
+        const validLatencies = latencies.filter(Number.isFinite);
+        const latencyMs = validLatencies.length
+            ? validLatencies.reduce((a, b) => a + b, 0) / validLatencies.length
+            : null;
+
+        // --- Bandwidth ----------------------------------------------------
+        let bandwidthMbps = null;
+        try {
+            const size = 500_000; // 0.5 MB
+            const t0 = performance.now();
+            const resp = await fetch(`/bw?bytes=${size}&cb=${Math.random()}`, { cache: 'no-store' });
+            // Read body fully to ensure complete download
+            await resp.arrayBuffer();
+            const deltaMs = performance.now() - t0;
+            bandwidthMbps = (size * 8) / (deltaMs * 1_000); // bits / ms → Mbps
+        } catch {
+            // ignore
+        }
+
+        return { latencyMs, bandwidthMbps };
+    },
+
+    // ------------------------------------------------------------------
     // Battery Status API (async)
     // ------------------------------------------------------------------
     async getBatteryInfo() {
@@ -195,11 +236,28 @@ const ui = {
             { label: 'Memory', value: typeof mem === 'number' ? `${mem} GB` : 'n/a', good: typeof mem === 'number' ? mem > 4 : true }
         ];
 
-        // Network chip (if available)
-        if (data.network && Object.keys(data.network).length) {
-            const rtt = typeof data.network.rtt === 'number' ? `${data.network.rtt} ms RTT` : 'RTT n/a';
-            const netLabel = `${data.network.effectiveType?.toUpperCase() || 'NET'} • ${rtt}`;
-            items.unshift({ label: 'Network', value: netLabel, good: data.network.rtt && data.network.rtt < 150 });
+        // Network chip – prefer actively measured numbers if present
+        if (data.network) {
+            const measured = data.network.measured || {};
+            let effType = data.network.effectiveType?.toUpperCase() || '';
+            if (!effType || effType === '4G') {
+                effType = 'NET';
+            }
+
+            const rttVal = (typeof measured.latencyMs === 'number')
+                ? `${Math.round(measured.latencyMs)} ms`
+                : (typeof data.network.rtt === 'number' ? `${data.network.rtt} ms` : 'n/a');
+
+            const bwVal = (typeof measured.bandwidthMbps === 'number')
+                ? `${measured.bandwidthMbps.toFixed(1)} Mbps`
+                : (typeof data.network.downlink === 'number' ? `${data.network.downlink} Mbps` : '');
+
+            const label = `${effType}${bwVal ? ` • ${bwVal}` : ''} • ${rttVal}`;
+
+            const good = (typeof measured.latencyMs === 'number' && measured.latencyMs < 150)
+                || (typeof data.network.rtt === 'number' && data.network.rtt < 150);
+
+            items.unshift({ label: 'Network', value: label, good });
         }
 
         // Battery chip (if available)
@@ -542,6 +600,13 @@ async function collectData() {
         battery: await collectors.getBatteryInfo(),
         errors
     };
+
+    // Active network measurement (does 2 HTTP calls; non-blocking for UX)
+    try {
+        data.network.measured = await collectors.measureNetworkPerformance();
+    } catch {
+        // best-effort – ignore failures
+    }
 
     // Capture Core Web Vitals before rendering UI; they resolve quickly
     data.performance.webVitals = await collectors.getWebVitals();

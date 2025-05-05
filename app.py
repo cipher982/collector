@@ -110,6 +110,36 @@ def health() -> tuple[dict[str, str], int]:  # noqa: D401 – Flask view
 
 
 # ---------------------------------------------------------------------------
+# Lightweight endpoints for client-side network testing
+# ---------------------------------------------------------------------------
+
+
+@app.route("/ping")
+def ping():  # noqa: D401 – simple latency probe
+    """Return a minimal JSON payload quickly for RTT measurement."""
+
+    return jsonify({"ok": True})
+
+
+@app.route("/bw")
+def bandwidth():  # noqa: D401 – simple bandwidth test payload
+    """Serve a blob of a requested size (bytes) for bandwidth estimation.
+
+    Client requests `/bw?bytes=500000` → server sends *bytes* repeated "x".
+    The response is intentionally uncompressed (text/plain) so size on the
+    wire is deterministic.
+    """
+
+    try:
+        size = int(request.args.get("bytes", 500_000))  # default ≈ 0.5 MB
+        size = max(0, min(size, 5_000_000))  # cap at 5 MB safety
+    except (TypeError, ValueError):
+        size = 500_000
+
+    return ("x" * size, 200, {"Content-Type": "text/plain"})
+
+
+# ---------------------------------------------------------------------------
 # Entry-point helper
 # ---------------------------------------------------------------------------
 

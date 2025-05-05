@@ -7,15 +7,42 @@ optional and can be skipped via ``--skip-e2e``.
 
 from __future__ import annotations
 
+# ruff: noqa: I001 – intentional grouping due to early stub injection
+
 import socket
+import sys
 import threading
 import time
 from contextlib import contextmanager
-from typing import Any
-from typing import Generator
-from typing import List
+from types import ModuleType
+from typing import Any, Generator, List
 
 import pytest
+
+# ---------------------------------------------------------------------------
+# Ensure *flask_socketio* is importable even when the real library isn't
+# present in the minimal CI environment.  The application requires the actual
+# dependency in production, but for unit tests we can get away with a stub
+# exposing just *SocketIO.emit* and *SocketIO.run* so that `import app` does
+# not fail.
+# ---------------------------------------------------------------------------
+
+
+if "flask_socketio" not in sys.modules:
+    fake_mod = ModuleType("flask_socketio")
+
+    class _FakeSocketIO:  # noqa: D401 – minimal subset for tests
+        def __init__(self, *_, **__):
+            pass
+
+        def emit(self, *_, **__):
+            pass
+
+        def run(self, *_, **__):
+            pass
+
+    fake_mod.SocketIO = _FakeSocketIO  # type: ignore[attr-defined]
+    sys.modules["flask_socketio"] = fake_mod
 
 # ---------------------------------------------------------------------------
 # CLI option

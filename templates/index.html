@@ -5,6 +5,7 @@
     <title>Browser Fingerprinting Demo</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" defer></script>
     <!-- Small 2kB RUM helper for Core Web Vitals -->
     <script src="https://unpkg.com/web-vitals@3/dist/web-vitals.iife.min.js" defer></script>
     <style>
@@ -102,6 +103,7 @@
                 <button class="tab-button active" data-tab="overview">Overview</button>
                 <button class="tab-button" data-tab="performance">Performance</button>
                 <button class="tab-button" data-tab="waterfall">Waterfall</button>
+                <button class="tab-button" data-tab="timeline">Timeline</button>
                 <button class="tab-button" data-tab="vitals">Vitals</button>
                 <button class="tab-button" data-tab="fingerprint">Fingerprint</button>
                 <button class="tab-button" data-tab="raw">Raw Data</button>
@@ -111,6 +113,13 @@
             <div id="waterfall" class="tab-content">
                 <div class="chart-container">
                     <canvas id="waterfallChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Live Timeline tab -->
+            <div id="timeline" class="tab-content">
+                <div class="chart-container">
+                    <canvas id="timelineChart"></canvas>
                 </div>
             </div>
 

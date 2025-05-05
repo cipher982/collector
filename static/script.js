@@ -456,7 +456,66 @@ const ui = {
         if (debugOutput) {
             debugOutput.textContent = JSON.stringify(data, null, 2);
         }
-    }
+    },
+
+    // ------------------------------------------------------------------
+    // Live timeline initialisation – returns Chart instance
+    // ------------------------------------------------------------------
+    initializeTimeline() {
+        const ctx = document.getElementById('timelineChart');
+        if (!ctx) return null;
+
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'LCP (ms)',
+                        data: [],
+                        borderColor: 'rgba(0, 200, 83, 0.8)',
+                        backgroundColor: 'rgba(0, 200, 83, 0.3)',
+                        tension: 0.3,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: 'JS Errors',
+                        data: [],
+                        type: 'bar',
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        yAxisID: 'y1',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        position: 'left',
+                        title: { display: true, text: 'LCP (ms)', color: '#e0e0e0' },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#e0e0e0' },
+                    },
+                    y1: {
+                        position: 'right',
+                        title: { display: true, text: 'Error count', color: '#e0e0e0' },
+                        grid: { drawOnChartArea: false },
+                        min: 0,
+                        ticks: { color: '#e0e0e0', stepSize: 1 },
+                    },
+                    x: {
+                        ticks: { color: '#e0e0e0' },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                    },
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e0e0e0' },
+                    },
+                },
+            },
+        });
+    },
 };
 
 // Data submission
@@ -511,4 +570,37 @@ async function collectData() {
 window.onload = () => {
     ui.initializeTabs();
     collectData();
+    initializeLiveUpdates();
 };
+
+// ------------------------------------------------------------------
+// Socket.IO live updates
+// ------------------------------------------------------------------
+
+function initializeLiveUpdates() {
+    // Ensure client library is present
+    if (typeof io === 'undefined') return;
+
+    const socket = io(); // connects to same host/port automatically
+    const timelineChart = ui.initializeTimeline();
+    if (!timelineChart) return;
+
+    socket.on('new_payload', payload => {
+        if (!payload || !payload.timestamp) return;
+
+        const label = new Date(payload.timestamp).toLocaleTimeString();
+
+        timelineChart.data.labels.push(label);
+        timelineChart.data.datasets[0].data.push(payload.lcp ?? null);
+        timelineChart.data.datasets[1].data.push(payload.errorCount ?? 0);
+
+        // keep last 50 points to avoid memory bloat
+        const maxPoints = 50;
+        if (timelineChart.data.labels.length > maxPoints) {
+            timelineChart.data.labels.shift();
+            timelineChart.data.datasets.forEach(ds => ds.data.shift());
+        }
+
+        timelineChart.update('none');
+    });
+}

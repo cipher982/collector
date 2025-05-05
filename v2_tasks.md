@@ -22,13 +22,14 @@
 
 ## B. Near-term (2-4 weeks) – “Rich interactive dashboard”
 
-    1. Live timeline panel
-        • Create a WebSocket endpoint (/ws) that echoes new events; update charts without refresh.
-        • Stack-area chart of LCP over time; vertical markers for JS error spikes.
-    2. Comparison mode
-        • Add a second payload capture button (“snapshot”).
-        • Side-by-side diff view that highlights changed fields between two captures (great to see
-what fingerprint pieces stay stable).
+    1. Live timeline panel  ✅ *COMPLETED 2025-05-04*
+        • /collect now broadcasts minimal metrics over Socket.IO (fallback stub when dep missing).  
+        • Front-end connects via socket.io and updates a live line+bar chart in the new “Timeline” tab:  
+          – LCP plotted continuously, error spikes shown as red bars.  
+          – Keeps rolling window of latest 50 points.
+    2. ~Comparison mode~  ❌ *Removed*
+        After discussion this feature was deemed low-value and has been removed from the roadmap.
+        Effort will be redirected to more impactful items (feature-support matrix, treemap, alerting).
     3. Feature-support matrix
         • Run modern-feature detection (e.g., WebGPU, AVIF, SharedArrayBuffer).
         • Visualise as coloured grid like “Can I use” but for the current browser.
@@ -78,6 +79,7 @@ sluggish on 3 G devices because …”.
 
 ### Upcoming code to write
 
-• Mini waterfall (Chart.js bar-offset) – could live inside existing `script.js` or separate `waterfall.js`.  
 • Theme switcher – small toggler manipulating `document.documentElement.dataset.theme`.  
-• After Immediate tasks: new tabs (“Compare”, etc.), websocket endpoint, d3 treemap, diff viewer.
+• Feature-support matrix (WebGPU, AVIF…) in a coloured grid.  
+• Resource-type treemap using d3.treemap to visualise JS vs CSS vs Images bytes.  
+• Optional alerting banner when Core Web Vitals slip beyond thresholds.

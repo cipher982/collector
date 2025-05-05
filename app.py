@@ -1,29 +1,32 @@
 """Flask entry-point for the Browser Debug Dashboard.
 
 The module is intentionally slim – it delegates all persistence work to
-`db.py` and keeps only routing and request/response concerns here.
+`db.py` and keeps only routing and request/response concerns.  WebSocket
+functionality is a *hard* requirement and is provided by **Flask-SocketIO** –
+there is no silent downgrade path; if the dependency is missing the
+application will fail fast at import-time so the stack can be fixed rather
+than degrading.
 """
 
 from __future__ import annotations
 
+# ruff: noqa: I001 – keep imports grouped for clarity; SocketIO import must
+# precede several local imports.
+
 import argparse
 import logging
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 from dotenv import load_dotenv
-from flask import Flask
-from flask import jsonify
-from flask import render_template
-from flask import request
+from flask import Flask, jsonify, render_template, request
+from flask_socketio import SocketIO  # mandatory dependency
 
-from db import get_conn
+from db import get_conn, insert_debug_record
 from db import init as init_db
-from db import insert_debug_record
 
-# -------------------------------------------------------------------------
-# Logging & env
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Logging & environment
+# ---------------------------------------------------------------------------
 
 
 logging.basicConfig(level=logging.INFO)
@@ -31,27 +34,37 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-
-# -------------------------------------------------------------------------
-# Flask setup
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Flask & Socket.IO setup
+# ---------------------------------------------------------------------------
 
 
 app = Flask(__name__)
 
+# Thread-based async mode works out-of-the-box (no eventlet/gevent needed)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# -------------------------------------------------------------------------
+
+def _socket_emit(event: str, data) -> None:  # noqa: D401 – thin wrapper
+    """Emit *event* with *data* through the singleton Socket.IO instance."""
+
+    socketio.emit(event, data)
+
+
+# ---------------------------------------------------------------------------
 # Routes
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 
 @app.route("/")
-def index():
+def index():  # noqa: D401 – Flask view
     return render_template("index.html")
 
 
 @app.route("/collect", methods=["POST"])
-def collect() -> tuple[dict[str, Any], int]:
+def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
+    """Receive JSON payload from client, store it and fan-out to WebSocket."""
+
     try:
         data: Dict[str, Any] = request.get_json(force=True) or {}
 
@@ -63,6 +76,19 @@ def collect() -> tuple[dict[str, Any], int]:
             errors=data.get("errors", []),
         )
 
+        # Push a lightweight update to real-time dashboards.
+        vitals = data.get("performance", {}).get("webVitals", {})
+        _socket_emit(
+            "new_payload",
+            {
+                "timestamp": data.get("timestamp"),
+                "lcp": vitals.get("LCP"),
+                "fid": vitals.get("FID"),
+                "cls": vitals.get("CLS"),
+                "errorCount": len(data.get("errors", [])),
+            },
+        )
+
         return jsonify({"status": "ok"}), 200
     except Exception as exc:  # pylint: disable=broad-except
         logger.exception("Error while handling /collect: %s", exc)
@@ -70,9 +96,11 @@ def collect() -> tuple[dict[str, Any], int]:
 
 
 @app.route("/health")
-def health() -> tuple[dict[str, str], int]:
+def health() -> tuple[dict[str, str], int]:  # noqa: D401 – Flask view
+    """Simple readiness probe used by Docker/K8s health-checks."""
+
     try:
-        # Simple connection test
+        # Cheap connection test
         with get_conn():
             pass
         return jsonify({"status": "healthy", "database": "connected"}), 200
@@ -81,24 +109,25 @@ def health() -> tuple[dict[str, str], int]:
         return jsonify({"status": "unhealthy", "database": str(exc)}), 500
 
 
-# -------------------------------------------------------------------------
-# Entry-point
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Entry-point helper
+# ---------------------------------------------------------------------------
 
 
 def main() -> None:  # pragma: no cover – executed only as script
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0", help="Host address")
     parser.add_argument("--port", type=int, default=5000, help="Port number")
-    parser.add_argument("--skip-db", action="store_true", help="Skip database initialisation")
+    parser.add_argument("--skip-db", action="store_true", help="Skip DB initialisation")
 
     args = parser.parse_args()
 
     if not args.skip_db:
         init_db()
 
-    app.run(host=args.host, port=args.port)
+    # Run via Socket.IO so WebSocket endpoint is active.
+    socketio.run(app, host=args.host, port=args.port)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

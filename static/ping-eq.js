@@ -264,7 +264,9 @@ class PingEqualizer extends HTMLElement {
             if (i === 0) ctx.moveTo(i, y);
             else ctx.lineTo(i, y);
         }
-        ctx.strokeStyle = '#57f';
+        // Use theme accent-neutral colour if available.
+        const cssColor = getComputedStyle(document.documentElement).getPropertyValue('--c-accent-neutral').trim();
+        ctx.strokeStyle = cssColor || '#57f';
         ctx.lineWidth = 1;
         ctx.stroke();
     }
@@ -308,6 +310,45 @@ class PingEqualizer extends HTMLElement {
 
     _stop() {
         this._running = false;
+    }
+
+    // ------------------------------------------------------------------
+    // Public helper – return rolling stats of the latency ring buffer.
+    // ------------------------------------------------------------------
+
+    /**
+     * Compute mean / standard-deviation / min / max for the samples that have
+     * already been written into the ring buffer.  Zero or non-finite samples
+     * (place-holders for failed pings) are ignored so they do not skew the
+     * distribution.
+     *
+     * Returns an empty object if no valid samples are present yet.
+     */
+    getStats() {
+        const values = Array.from(this._ring).filter((v) => Number.isFinite(v) && v > 0);
+        if (!values.length) return {};
+
+        const n = values.length;
+        const mean = values.reduce((a, b) => a + b, 0) / n;
+        const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / n;
+        const stddev = Math.sqrt(variance);
+
+        return {
+            mean,
+            stddev,
+            min: Math.min(...values),
+            max: Math.max(...values),
+            samples: n,
+            last: values[values.length - 1],
+        };
+    }
+
+    /**
+     * Return the most recent latency sample in milliseconds (NaN if none).
+     */
+    getLastSample() {
+        const idx = (this._ringPtr - 1 + this._width) % this._width;
+        return this._ring[idx] || NaN;
     }
 }
 

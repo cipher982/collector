@@ -1,0 +1,20 @@
+:root {
+  /* neutrals */
+  --c-bg-dark:    #1a1a1a;
+  --c-bg-card:    #2d2d2d;
+  --c-fg-text:    #e0e0e0;
+  --c-border-card:#404040;
+  --c-text-muted: #a0a0a0;
+
+  /* semantic accents */
+  --c-accent-good:    #2ecc71;
+  --c-accent-warn:    #f1c40f;
+  --c-accent-error:   #e74c3c;
+  --c-accent-info:    #00bfff;
+  --c-accent-neutral: #57f;
+}
+
+/* Status indicator colours reuse the palette */
+.status-indicator.status-good    { background-color: var(--c-accent-good); }
+.status-indicator.status-warning { background-color: var(--c-accent-warn); }
+.status-indicator.status-error   { background-color: var(--c-accent-error); }

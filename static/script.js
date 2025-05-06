@@ -1,7 +1,7 @@
 // Configuration
 const CONFIG = {
     COLLECTION_DELAY: 3000,
-    ENDPOINT: "/collect"
+    ENDPOINT: "/collect",
 };
 
 // WebGL compressed texture extensions we probe for – kept at module scope to avoid
@@ -341,6 +341,28 @@ const collectors = {
         if (!gl) return {};
 
         return Object.fromEntries(TEXTURE_EXT_NAMES.map((n) => [n, !!gl.getExtension(n)]));
+    },
+
+    // ------------------------------------------------------------------
+    // Live RTT statistics (mean / jitter) sourced from <ping-eq> element
+    // ------------------------------------------------------------------
+
+    getLiveRttStats() {
+        // The custom element is rendered with id="pingBars" on the page.
+        const el = document.getElementById('pingBars');
+        if (el && typeof el.getStats === 'function') {
+            const stats = el.getStats();
+            if (stats && stats.samples) {
+                return {
+                    meanMs: Math.round(stats.mean),
+                    jitterMs: Math.round(stats.stddev),
+                    minMs: Math.round(stats.min),
+                    maxMs: Math.round(stats.max),
+                    samples: stats.samples,
+                };
+            }
+        }
+        return {};
     }
 };
 
@@ -379,14 +401,23 @@ const ui = {
         // Network chip – prefer actively measured numbers if present
         if (data.network) {
             const measured = data.network.measured || {};
+            const rttStats = data.network.rttStats || {};
             let effType = data.network.effectiveType?.toUpperCase() || '';
             if (!effType || effType === '4G') {
                 effType = 'NET';
             }
 
-            const rttVal = (typeof measured.latencyMs === 'number')
-                ? `${Math.round(measured.latencyMs)} ms`
-                : (typeof data.network.rtt === 'number' ? `${data.network.rtt} ms` : 'n/a');
+            let rttVal;
+            if (typeof rttStats.meanMs === 'number') {
+                // Display mean ± jitter when live stats available
+                rttVal = `${rttStats.meanMs} ± ${rttStats.jitterMs} ms`;
+            } else if (typeof measured.latencyMs === 'number') {
+                rttVal = `${Math.round(measured.latencyMs)} ms`;
+            } else if (typeof data.network.rtt === 'number') {
+                rttVal = `${data.network.rtt} ms`;
+            } else {
+                rttVal = 'n/a';
+            }
 
             const bwVal = (typeof measured.bandwidthMbps === 'number')
                 ? `${measured.bandwidthMbps.toFixed(1)} Mbps`
@@ -394,10 +425,11 @@ const ui = {
 
             const label = `${effType}${bwVal ? ` • ${bwVal}` : ''} • ${rttVal}`;
 
-            const good = (typeof measured.latencyMs === 'number' && measured.latencyMs < 150)
+            const latencyForGood = typeof rttStats.meanMs === 'number' ? rttStats.meanMs : measured.latencyMs;
+            const good = (typeof latencyForGood === 'number' && latencyForGood < 150)
                 || (typeof data.network.rtt === 'number' && data.network.rtt < 150);
 
-            items.unshift({ label: 'Network', value: label, good });
+            items.unshift({ label: 'Network', value: label, good, id: 'networkChip' });
         }
 
         // Battery chip (if available)
@@ -406,12 +438,16 @@ const ui = {
             items.push({ label: 'Battery', value: batteryLabel, good: data.battery.level > 20 });
         }
 
-        statusDiv.innerHTML = items.map(item => `
-            <div>
-                <span class="status-indicator ${item.good ? 'status-good' : 'status-warning'}"></span>
-                <strong>${item.label}:</strong> ${item.value}
-            </div>
-        `).join('');
+        statusDiv.innerHTML = items.map(item => {
+            const dot = item.showDot === false ? '' : `<span class="status-indicator ${item.good ? 'status-good' : 'status-warning'}"></span>`;
+            return `
+                <div${item.id ? ` id="${item.id}"` : ''}>
+                    ${dot}
+                    <strong>${item.label}:</strong> ${item.value}
+                </div>`;
+        }).join('');
+
+        // Pulse animation removed for network indicator (requested).
     },
 
     displayBrowserInfo(data) {
@@ -824,6 +860,8 @@ async function submitData(data) {
     }
 }
 
+
+
 // Main collection function
 async function collectData() {
     try {
@@ -838,7 +876,10 @@ async function collectData() {
             fonts: collectors.getFontFingerprint(),
             webgl: collectors.getWebGLInfo()
         },
-        network: collectors.getNetworkInfo(),
+        network: {
+            ...collectors.getNetworkInfo(),
+            rttStats: collectors.getLiveRttStats(),
+        },
         battery: await collectors.getBatteryInfo(),
         errors
     };
@@ -891,6 +932,10 @@ async function collectData() {
         ui.displayGpuBenchmarks,
     ].forEach((fn) => safeCall(() => fn(data)));
 
+
+    // Expose globally for live update helpers
+    window.__currentDebugData = data;
+
     setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);
 
     } catch (err) {
@@ -903,6 +948,149 @@ window.onload = () => {
     collectData();
     initializeLiveUpdates();
     ui.startGpuDemo?.();
+
+    // ------------------------------------------------------------------
+    // Neon RTT sparkline ------------------------------------------------
+    // ------------------------------------------------------------------
+
+    const sparkCtx = document.getElementById('rttSpark')?.getContext('2d');
+    let rttChart = null;
+
+    // Helper to read CSS var and optionally add alpha for rgba.
+    const css = (v, alpha=null) => {
+        let c = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+        if (!c) return c;
+        if (alpha == null) return c;
+        // Convert #rrggbb → rgba(r,g,b,alpha)
+        if (c.startsWith('#')) {
+            const hex = c.slice(1);
+            const bigint = parseInt(hex.length === 3 ? hex.split('').map(s=>s+s).join('') : hex, 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+        // assume already css color; return with alpha not handled
+        return c;
+    };
+
+    if (sparkCtx) {
+        rttChart = new Chart(sparkCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Latency',
+                        data: [],
+                        borderColor: css('--c-accent-info'),
+                        backgroundColor: css('--c-accent-info', 0.15),
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.3,
+                        fill: false,
+                    },
+                    {
+                        label: 'Upper',
+                        data: [],
+                        borderColor: 'rgba(0,0,0,0)',
+                        pointRadius: 0,
+                        fill: false,
+                    },
+                    {
+                        label: 'Lower',
+                        data: [],
+                        borderColor: 'rgba(0,0,0,0)',
+                        pointRadius: 0,
+                        fill: { target: 1 }, // fill area to the upper dataset
+                        backgroundColor: css('--c-accent-warn', 0.25),
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                plugins: { legend: { display: false } },
+                elements: { line: { tension: 0.3 } },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: false,
+                        min: 0,
+                        max: 100,
+                    },
+                },
+            },
+        });
+    }
+
+    // Push new RTT sample every second for sparkline
+    setInterval(() => {
+        if (!rttChart) return;
+        const el = document.getElementById('pingBars');
+        if (!el || typeof el.getLastSample !== 'function') return;
+        const sample = el.getLastSample();
+        if (!Number.isFinite(sample) || sample <= 0) return;
+
+        // Jitter uses current stddev from ring stats; fallback 0.
+        const stats = el.getStats ? el.getStats() : {};
+        const jitter = Number.isFinite(stats.stddev) ? stats.stddev : 0;
+
+        const upper = sample + jitter;
+        const lower = Math.max(0, sample - jitter);
+
+        const tsLabel = new Date().toLocaleTimeString();
+        const { labels, datasets } = rttChart.data;
+
+        labels.push(tsLabel);
+        datasets[0].data.push(sample);   // latency line
+        datasets[1].data.push(upper);    // upper bound
+        datasets[2].data.push(lower);    // lower bound
+
+        const maxPoints = 120;
+        if (labels.length > maxPoints) {
+            labels.shift();
+            datasets.forEach((d) => d.data.shift());
+        }
+
+        // Dynamic y-axis based on upper/lower values.
+        const allVals = [...datasets[1].data, ...datasets[2].data];
+        const maxVal = Math.max(...allVals);
+        const minVal = Math.min(...allVals);
+
+        const padding = 5; // ms top/bottom padding
+        rttChart.options.scales.y.min = Math.max(0, Math.floor(minVal - padding));
+        rttChart.options.scales.y.max = Math.ceil(maxVal + padding);
+
+        rttChart.update('none');
+    }, 1000);
+
+    // ------------------------------------------------------------------
+    // Periodically refresh the Network chip with live RTT / jitter stats.
+    // ------------------------------------------------------------------
+
+    setInterval(() => {
+        const el = document.getElementById('pingBars');
+        const base = window.__currentDebugData;
+        if (!base || !el || typeof el.getStats !== 'function') return;
+
+        const stats = el.getStats();
+        if (!stats.samples) return;
+
+        base.network = {
+            ...collectors.getNetworkInfo(),
+            rttStats: {
+                meanMs: Math.round(stats.mean),
+                jitterMs: Math.round(stats.stddev),
+                minMs: Math.round(stats.min),
+                maxMs: Math.round(stats.max),
+                samples: stats.samples,
+            },
+            measured: base.network?.measured,
+        };
+
+        ui.displaySystemStatus(base);
+    }, 2000); // every 2 seconds
 };
 
 // ------------------------------------------------------------------

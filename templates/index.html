@@ -7,6 +7,9 @@
     <!-- Pico.css base styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
 
+    <!-- App theme palette -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+
     <!-- 3rd-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Three.js for live GPU demo -->
@@ -21,41 +24,41 @@
             margin: 0 auto;
             padding: 20px;
             max-width: 1400px; /* expand a bit so content breathes less white-space on large monitors */
-            background-color: #1a1a1a;
-            color: #e0e0e0;
+            background-color: var(--c-bg-dark);
+            color: var(--c-fg-text);
         }
 
         h1, h2, h3 { color: #ffffff; }
         strong       { color: #ffffff; }
 
-        .loading { color: #a0a0a0; font-style: italic; }
+        .loading { color: var(--c-text-muted); font-style: italic; }
 
         /* Legacy card / chart styles reused by JS ------------------------- */
         .metric-card {
-            background: #2d2d2d;
+            background: var(--c-bg-card);
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 15px;
-            border: 1px solid #404040;
+            border: 1px solid var(--c-border-card);
         }
 
         .chart-container {
             height: 300px;
             margin: 20px 0;
-            background: #2d2d2d;
+            background: var(--c-bg-card);
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #404040;
+            border: 1px solid var(--c-border-card);
         }
 
         .full-width { width: 100%; }
 
         pre {
-            background: #2d2d2d;
+            background: var(--c-bg-card);
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #404040;
-            color: #e0e0e0;
+            border: 1px solid var(--c-border-card);
+            color: var(--c-fg-text);
         }
 
         /* New layout helpers ---------------------------------------------- */
@@ -101,9 +104,8 @@
             border-radius: 50%;
             margin-right: 8px;
         }
-        .status-good    { background-color: #2ecc71; }
-        .status-warning { background-color: #f1c40f; }
-        .status-error   { background-color: #e74c3c; }
+
+        /* removed pulse animation: reserved for future use */
 
         /* Core Web Vitals micro-cards */
         #coreVitals {
@@ -137,12 +139,15 @@
             <h3>System Status</h3>
             <div id="systemStatus"></div>
 
-            <p id="memoryNote" style="display:none; font-size:0.8em; color:#a0a0a0; margin-top:4px;">
+            <p id="memoryNote" style="display:none; font-size:0.8em; color:var(--c-text-muted); margin-top:4px;">
                 <!-- Populated by script.js when memory is capped -->
             </p>
 
-            <!-- Live latency equalizer (Web Component) -->
-            <ping-eq id="pingBars" mode="socket" width="60" interval="1000"></ping-eq>
+            <!-- Hidden Ping Equalizer provides latency samples -->
+            <ping-eq id="pingBars" mode="socket" width="60" interval="1000" sparkline="off" style="display:none;"></ping-eq>
+
+            <!-- Latency + jitter sparkline (line + shaded band) -->
+            <canvas id="rttSpark" height="60" style="width:100%; margin-top:6px; background:var(--c-bg-dark); border-radius:4px;"></canvas>
         </article>
 
         <!-- Browser / device context -->
@@ -254,8 +259,7 @@
     <!-- -----------------------------------------------------------------
          Scripts
     ------------------------------------------------------------------ -->
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-    <!-- WebComponent equalizer module -->
+    <script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='ping-eq.js') }}"></script>
 </body>
 </html>

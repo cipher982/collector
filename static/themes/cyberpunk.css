@@ -1,0 +1,36 @@
+/* ---------------------------------------------------------
+   CYBERPUNK THEME – neon synthwave palette
+   Only variable overrides.
+--------------------------------------------------------- */
+
+:root[data-theme='cyberpunk'],
+:root.cyberpunk {
+  /* base neutrals */
+  --c-bg-dark:    #05040f;  /* almost black with hint of blue/purple */
+  --c-bg-card:    #120b2d;  /* deep indigo surface */
+  --c-fg-text:    #d7d7ff;  /* soft white (reduces glare) */
+  --c-border-card:#2a1f5f;  /* subtle border */
+  --c-text-muted: #7a70c0;  /* desaturated purple */
+
+  /* semantic accents – dialled-down neon */
+  --c-accent-good:    #00dba0; /* teal-green */
+  --c-accent-warn:    #ffb700; /* warm amber */
+  --c-accent-error:   #ff3b82; /* hot pink (toned) */
+  --c-accent-info:    #14d8ff; /* electric cyan (slightly muted) */
+  --c-accent-neutral: #a45eff; /* lavender purple */
+
+  /* chart palette */
+  --c-series-1: #14d8ff;
+  --c-series-2: #ff3b82;
+  --c-grid: rgba(255, 255, 255, 0.08);
+
+  --primary:   var(--c-accent-info);
+  --secondary: var(--c-accent-neutral);
+  --background:var(--c-bg-dark);
+  --surface:   var(--c-bg-card);
+  --contrast:  var(--c-fg-text);
+
+  /* Override Pico general colour vars to eliminate white background */
+  --background-color: var(--c-bg-dark); /* page background */
+  --color:            var(--c-fg-text); /* base text colour */
+}

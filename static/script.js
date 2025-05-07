@@ -4,6 +4,57 @@ const CONFIG = {
     ENDPOINT: "/collect",
 };
 
+// ------------------------------------------------------------------
+// Colour helpers (phase-1 theme refactor)
+// ------------------------------------------------------------------
+
+/**
+ * Read a CSS custom property from :root.
+ * @param {string} name  e.g. '--c-series-1'
+ * @returns {string}
+ */
+function cssVar(name) {
+    return getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+}
+
+/**
+ * Return colour as rgba() where `alpha` is applied.
+ *  - If the variable is hex (#rrggbb or #rgb) we convert.
+ *  - If it is already rgb/rgba() we inject/override alpha.
+ *  - Otherwise returns the raw value (best-effort).
+ */
+function cssVarAlpha(name, alpha = 1) {
+    let raw = cssVar(name);
+
+    if (!raw) return "";
+
+    // HEX → rgba
+    if (raw.startsWith("#")) {
+        let hex = raw.slice(1);
+        if (hex.length === 3) {
+            hex = hex.split(""
+            ).map(c => c + c).join("");
+        }
+        const intVal = parseInt(hex, 16);
+        const r = (intVal >> 16) & 255;
+        const g = (intVal >> 8) & 255;
+        const b = intVal & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // rgb/rgba → rgba with new alpha
+    const rgbMatch = raw.match(/rgba?\(([^)]+)\)/);
+    if (rgbMatch) {
+        const [r, g, b] = rgbMatch[1].split(',').map(s => s.trim()).slice(0, 3);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // Fallback – return raw (may be "red" etc.)
+    return raw;
+}
+
 // WebGL compressed texture extensions we probe for – kept at module scope to avoid
 // re-allocating the same array every call.
 const TEXTURE_EXT_NAMES = [
@@ -481,14 +532,14 @@ const ui = {
                 datasets: [{
                     label: 'Load Time (ms)',
                     data: resourceData.durations,
-                    backgroundColor: 'rgba(45, 136, 255, 0.7)',
-                    borderColor: 'rgba(45, 136, 255, 1)',
+                    backgroundColor: cssVarAlpha('--c-series-1', 0.7),
+                    borderColor: cssVar('--c-series-1'),
                     borderWidth: 1
                 }, {
                     label: 'Size (KB)',
                     data: resourceData.sizes,
-                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: cssVarAlpha('--c-series-2', 0.7),
+                    borderColor: cssVar('--c-series-2'),
                     borderWidth: 1
                 }]
             },
@@ -498,7 +549,7 @@ const ui = {
                     y: {
                         beginAtZero: true,
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
+                            color: cssVar('--c-grid')
                         },
                         ticks: {
                             color: '#e0e0e0'
@@ -506,7 +557,7 @@ const ui = {
                     },
                     x: {
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
+                            color: cssVar('--c-grid')
                         },
                         ticks: {
                             color: '#e0e0e0'
@@ -564,8 +615,8 @@ const ui = {
                     {
                         label: 'Transfer',
                         data: transfers,
-                        backgroundColor: 'rgba(45, 136, 255, 0.7)',
-                        borderColor: 'rgba(45,136,255,1)',
+                        backgroundColor: cssVarAlpha('--c-series-1', 0.7),
+                        borderColor: cssVar('--c-series-1'),
                         stack: 'combined',
                     },
                 ],
@@ -576,13 +627,13 @@ const ui = {
                 scales: {
                     x: {
                         stacked: true,
-                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: cssVar('--c-grid') },
                         ticks: { color: '#e0e0e0' },
                         title: { display: true, text: 'ms', color: '#e0e0e0' },
                     },
                     y: {
                         stacked: true,
-                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: cssVar('--c-grid') },
                         ticks: { color: '#e0e0e0' },
                     },
                 },
@@ -797,8 +848,8 @@ const ui = {
                     {
                         label: 'LCP (ms)',
                         data: [],
-                        borderColor: 'rgba(0, 200, 83, 0.8)',
-                        backgroundColor: 'rgba(0, 200, 83, 0.3)',
+                        borderColor: cssVarAlpha('--c-accent-good', 0.8),
+                        backgroundColor: cssVarAlpha('--c-accent-good', 0.3),
                         tension: 0.3,
                         yAxisID: 'y',
                     },
@@ -806,7 +857,7 @@ const ui = {
                         label: 'JS Errors',
                         data: [],
                         type: 'bar',
-                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        backgroundColor: cssVarAlpha('--c-series-2', 0.7),
                         yAxisID: 'y1',
                     },
                 ],
@@ -817,7 +868,7 @@ const ui = {
                     y: {
                         position: 'left',
                         title: { display: true, text: 'LCP (ms)', color: '#e0e0e0' },
-                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: cssVar('--c-grid') },
                         ticks: { color: '#e0e0e0' },
                     },
                     y1: {
@@ -829,7 +880,7 @@ const ui = {
                     },
                     x: {
                         ticks: { color: '#e0e0e0' },
-                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: cssVar('--c-grid') },
                     },
                 },
                 plugins: {
@@ -1003,7 +1054,7 @@ window.onload = () => {
                         borderColor: 'rgba(0,0,0,0)',
                         pointRadius: 0,
                         fill: { target: 1 }, // fill area to the upper dataset
-                        backgroundColor: css('--c-accent-warn', 0.25),
+                        backgroundColor: css('--c-accent-neutral', 0.25),
                     },
                 ],
             },

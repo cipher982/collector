@@ -12,7 +12,19 @@
   --c-accent-error:   #e74c3c;
   --c-accent-info:    #00bfff;
   --c-accent-neutral: #57f;
+
+  /* Chart colour variables (phase-1) */
+  /* Solid brand colours; JS derives translucent variants dynamically */
+  --c-series-1: #2d88ff; /* primary dataset */
+  --c-series-2: #ff6384; /* secondary dataset */
+  --c-grid: rgba(255,255,255,0.1); /* chart grid */
 }
+
+/* Ensure the full page background (outside body max-width) matches the theme */
+html {
+  background-color: var(--c-bg-dark);
+}
+
 
 /* Status indicator colours reuse the palette */
 .status-indicator.status-good    { background-color: var(--c-accent-good); }

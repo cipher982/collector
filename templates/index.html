@@ -7,8 +7,12 @@
     <!-- Pico.css base styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
 
-    <!-- App theme palette -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <!-- App theme palette (default: dark) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='themes/dark.css') }}">
+
+    <script>
+        // Theme switcher removed
+    </script>
 
     <!-- 3rd-party libraries -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

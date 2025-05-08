@@ -1026,6 +1026,11 @@ window.onload = () => {
     };
 
     if (sparkCtx) {
+        // Visible history buffer count – keep equal at all times so the line
+        // scrolls smoothly without the initial "compression" effect where
+        // points are re-laid out wider until the array reaches capacity.
+        const CAP = 120; // 60 s @2 Hz
+
         rttChart = new Chart(sparkCtx, {
             type: 'line',
             data: {
@@ -1060,6 +1065,8 @@ window.onload = () => {
             },
             options: {
                 responsive: true,
+                // maintainAspectRatio left as default (true) to avoid the
+                // canvas blowing up in height on some layouts.
                 animation: false,
                 plugins: { legend: { display: false } },
                 elements: { line: { tension: 0.3 } },
@@ -1073,9 +1080,24 @@ window.onload = () => {
                 },
             },
         });
+
+        // Prefill labels & datasets with nulls so we start at full capacity.
+        const { labels, datasets } = rttChart.data;
+        for (let i = 0; i < CAP; i += 1) {
+            labels.push('');
+            datasets.forEach((d) => d.data.push(null));
+        }
     }
 
-    // Push new RTT sample every second for sparkline
+    // ------------------------------------------------------------------
+    // Sampling interval – how frequently we poll <ping-eq> for new latency
+    // values and push them into the spark-line chart.  halved from 1000 →
+    // 500 ms (2 samples / s) to make the graph move twice as fast.
+    // ------------------------------------------------------------------
+
+    const SAMPLE_INTERVAL_MS = 500; // 2× faster than before
+
+    // Push new RTT sample every SAMPLE_INTERVAL_MS for sparkline
     setInterval(() => {
         if (!rttChart) return;
         const el = document.getElementById('pingBars');
@@ -1098,16 +1120,49 @@ window.onload = () => {
         datasets[1].data.push(upper);    // upper bound
         datasets[2].data.push(lower);    // lower bound
 
-        const maxPoints = 120;
+        // Maintain a constant CAP-sized buffer (prefilled on start) so the
+        // X-spacing never changes – this avoids the visual "compression"
+        // while the chart is still warming up.
+        const maxPoints = 120; // must match CAP above
         if (labels.length > maxPoints) {
             labels.shift();
             datasets.forEach((d) => d.data.shift());
         }
 
         // Dynamic y-axis based on upper/lower values.
-        const allVals = [...datasets[1].data, ...datasets[2].data];
-        const maxVal = Math.max(...allVals);
-        const minVal = Math.min(...allVals);
+        // ------------------------------------------------------------------
+        // Dynamic axis scaling – ignore the very first handful of samples so
+        // an initial spike does not flatten subsequent values, *and* only
+        // scale based on a sliding window of the most recent samples.  This
+        // prevents a single early outlier from dominating the chart for a
+        // full two-minute history.
+        // ------------------------------------------------------------------
+
+        const SAMPLES_PER_SEC = 1000 / SAMPLE_INTERVAL_MS; // 2 with 500 ms
+
+        const WARMUP_SAMPLES = Math.round(5 * SAMPLES_PER_SEC);   // ignore first 5 s
+        const WINDOW_SIZE    = Math.round(30 * SAMPLES_PER_SEC);  // 30 s window
+
+        // Build a view onto the active data, excluding warm-up region and
+        // limiting to the sliding window.
+        const total = labels.length;
+        const startIdx = Math.max(WARMUP_SAMPLES, total - WINDOW_SIZE);
+
+        const windowUpper = datasets[1].data.slice(startIdx);
+        const windowLower = datasets[2].data.slice(startIdx);
+        const windowVals  = [...windowUpper, ...windowLower];
+
+        // Fallback safety – if we do not have enough points yet, resort to
+        // whatever values are present so the chart is not blank.
+        const safeVals = windowVals.length ? windowVals : [...datasets[1].data, ...datasets[2].data];
+
+        let maxVal = 100;
+        let minVal = 0;
+
+        if (safeVals.length) {
+            maxVal = Math.max(...safeVals);
+            minVal = Math.min(...safeVals);
+        }
 
         const padding = 5; // ms top/bottom padding
         rttChart.options.scales.y.min = Math.max(0, Math.floor(minVal - padding));

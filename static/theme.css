@@ -20,6 +20,12 @@
   --c-grid: rgba(255,255,255,0.1); /* chart grid */
 }
 
+/* Ensure mini RTT sparkline is never clipped – latest samples must remain
+   visible even when the parent card has strict overflow rules. */
+#rttSpark {
+  overflow-x: visible; /* ensure right-most samples are not clipped */
+}
+
 /* Ensure the full page background (outside body max-width) matches the theme */
 html {
   background-color: var(--c-bg-dark);

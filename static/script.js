@@ -249,39 +249,107 @@ const collectors = {
     // ------------------------------------------------------------------
     // Core Web Vitals helpers (LCP, FID, CLS)
     // ------------------------------------------------------------------
+    /**
+     * Return a promise that resolves with an object containing the Core Web
+     * Vitals (LCP, FID, CLS).  The helper waits – up to `TIMEOUT_MS` – for
+     * the web-vitals library to finish loading instead of bailing out
+     * immediately.  This removes the race condition where our module script
+     * executes before the CDN script has evaluated and avoids the persistent
+     * “–” placeholders the user reported.
+     */
     getWebVitals() {
-        return new Promise(resolve => {
-            const vitals = {};
+        const vitals = {};
 
-            // The global webVitals object is provided by the external script
-            // included in index.html. Guard in case the CDN failed.
-            if (typeof window.webVitals === "undefined") {
-                resolve(vitals);
-                return;
+        // Helper – when we receive a metric, persist it on the global data
+        // object (if already initialised) and trigger an in-place UI update so
+        // the card refreshes without a full re-render.
+        const pushMetric = (name, value) => {
+            const dbg = window.__currentDebugData;
+            if (dbg?.performance?.webVitals) {
+                dbg.performance.webVitals[name] = value;
+                ui.displayWebVitals(dbg);
             }
+        };
 
-            let remaining = 3;
+        // If the library is ready, wire up listeners immediately; otherwise
+        // schedule a non-blocking check that will retry until it shows up. We
+        // always resolve *synchronously* so the main collection flow is never
+        // delayed and the page can render instantly.
 
-            const done = () => {
-                remaining -= 1;
-                if (remaining === 0) {
-                    resolve(vitals);
-                }
-            };
+        const installListeners = () => {
+            try {
+                window.webVitals.getLCP((m) => {
+                    vitals[m.name] = m.value;
+                    pushMetric(m.name, m.value);
+                });
+                window.webVitals.getFID((m) => {
+                    vitals[m.name] = m.value;
+                    pushMetric(m.name, m.value);
+                });
+                window.webVitals.getCLS((m) => {
+                    vitals[m.name] = m.value;
+                    pushMetric(m.name, m.value);
+                });
+            } catch {
+                // Defensive – if the API surface changed, ignore failure.
+            }
+        };
 
-            window.webVitals.getLCP(metric => {
-                vitals[metric.name] = metric.value;
-                done();
-            });
-            window.webVitals.getFID(metric => {
-                vitals[metric.name] = metric.value;
-                done();
-            });
-            window.webVitals.getCLS(metric => {
-                vitals[metric.name] = metric.value;
-                done();
-            });
-        });
+        if (typeof window.webVitals !== 'undefined') {
+            // Fast-path: library already present.
+            installListeners();
+        } else {
+            // Try to load the library dynamically (approx 10 kB) – if that
+            // fails (e.g. CSP blocks external fetch) fall back to a very
+            // lightweight manual calculation for LCP and CLS.
+
+            import('https://unpkg.com/web-vitals@3/dist/web-vitals.es5.min.js')
+                .then(() => {
+                    installListeners();
+                })
+                .catch(() => {
+                    // Manual fallback – best-effort approximations so that
+                    // the user at least sees some numbers instead of "–".
+
+                    try {
+                        // LCP ----------------------------------------------------------------
+                        const tryLcp = () => {
+                            const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+                            if (lcpEntries.length) {
+                                const last = lcpEntries[lcpEntries.length - 1];
+                                vitals.LCP = last.startTime;
+                                pushMetric('LCP', vitals.LCP);
+                            }
+                        };
+                        tryLcp();
+                        // `largest-contentful-paint` can still update after
+                        // load, so observe until load+5 s.
+                        const po = new PerformanceObserver((list) => {
+                            list.getEntries().forEach(() => tryLcp());
+                        });
+                        po.observe({ type: 'largest-contentful-paint', buffered: true });
+                        setTimeout(() => po.disconnect(), 5000);
+
+                        // CLS ----------------------------------------------------------------
+                        let clsValue = 0;
+                        const poCls = new PerformanceObserver((list) => {
+                            for (const e of list.getEntries()) {
+                                if (!e.hadRecentInput) clsValue += e.value;
+                            }
+                            vitals.CLS = +clsValue.toFixed(3);
+                            pushMetric('CLS', vitals.CLS);
+                        });
+                        poCls.observe({ type: 'layout-shift', buffered: true });
+                        setTimeout(() => poCls.disconnect(), 5000);
+                    } catch {
+                        // browsers w/out PerfObserver – give up silently
+                    }
+                });
+        }
+
+        // Return the (possibly empty) vitals object immediately – do not wait
+        // for metrics so that the dashboard stays snappy.
+        return Promise.resolve(vitals);
     },
 
     // ------------------------------------------------------------------

@@ -1,4 +1,4 @@
-## PROJECT OVERVIEW
+#Collector
 
 This application is a real-time browser data collector and dashboard. It gathers browser information, performance metrics, fingerprinting data and client-side errors from users’ browsers, displays them in a tabbed UI, and stores the collected data in a PostgreSQL database for later analysis.
 

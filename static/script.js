@@ -321,7 +321,20 @@ const collectors = {
                                 pushMetric('LCP', vitals.LCP);
                             }
                         };
+                        
+                        // Check if LCP entries are available immediately
                         tryLcp();
+                        
+                        // If no LCP entries found, use a fallback based on navigation timing
+                        if (!vitals.LCP && performance.timing) {
+                            const navStart = performance.timing.navigationStart;
+                            const loadComplete = performance.timing.loadEventEnd;
+                            if (loadComplete > navStart) {
+                                vitals.LCP = loadComplete - navStart;
+                                pushMetric('LCP', vitals.LCP);
+                            }
+                        }
+                        
                         // `largest-contentful-paint` can still update after
                         // load, so observe until load+5 s.
                         const po = new PerformanceObserver((list) => {
@@ -329,6 +342,25 @@ const collectors = {
                         });
                         po.observe({ type: 'largest-contentful-paint', buffered: true });
                         setTimeout(() => po.disconnect(), 5000);
+
+                        // FID ----------------------------------------------------------------
+                        // FID measures the delay from when a user first interacts with a page
+                        // to when the browser is actually able to begin processing event handlers
+                        let fidValue = null;
+                        const poFid = new PerformanceObserver((list) => {
+                            for (const entry of list.getEntries()) {
+                                // Only record the first input delay
+                                if (fidValue === null) {
+                                    fidValue = entry.processingStart - entry.startTime;
+                                    vitals.FID = fidValue;
+                                    pushMetric('FID', vitals.FID);
+                                    poFid.disconnect();
+                                    break;
+                                }
+                            }
+                        });
+                        poFid.observe({ type: 'first-input', buffered: true });
+                        setTimeout(() => poFid.disconnect(), 5000);
 
                         // CLS ----------------------------------------------------------------
                         let clsValue = 0;

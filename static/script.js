@@ -1412,21 +1412,58 @@ function initializeLiveUpdates() {
     socket.on('new_payload', payload => {
         if (!payload || !payload.timestamp) return;
 
-        const label = new Date(payload.timestamp).toLocaleTimeString();
+        const baseTime = new Date(payload.timestamp);
+        
+        // Create waterfall by showing cumulative timing progression
+        const waterfallData = [];
+        let cumulative = 0;
+        
+        // Build waterfall sequence showing timing progression
+        if (payload.dnsTime) {
+            cumulative += payload.dnsTime;
+            waterfallData.push({ time: 0.0, dns: cumulative, label: 'DNS' });
+        }
+        if (payload.connectTime) {
+            cumulative += payload.connectTime;
+            waterfallData.push({ time: 0.2, connect: cumulative, label: 'Connect' });
+        }
+        if (payload.ttfb) {
+            waterfallData.push({ time: 0.4, ttfb: payload.ttfb, label: 'TTFB' });
+        }
+        if (payload.fcp) {
+            waterfallData.push({ time: 0.6, fcp: payload.fcp, label: 'FCP' });
+        }
+        if (payload.lcp) {
+            waterfallData.push({ time: 0.8, lcp: payload.lcp, label: 'LCP' });
+        }
+        if (payload.domReady) {
+            waterfallData.push({ time: 1.0, domReady: payload.domReady, label: 'DOM Ready' });
+        }
+        if (payload.loadComplete) {
+            waterfallData.push({ time: 1.2, loadComplete: payload.loadComplete, label: 'Load Complete' });
+        }
 
-        timelineChart.data.labels.push(label);
-        timelineChart.data.datasets[0].data.push(payload.lcp ?? null);           // LCP
-        timelineChart.data.datasets[1].data.push(payload.fcp ?? null);           // FCP
-        timelineChart.data.datasets[2].data.push(payload.ttfb ?? null);          // TTFB
-        timelineChart.data.datasets[3].data.push(payload.dnsTime ?? null);       // DNS
-        timelineChart.data.datasets[4].data.push(payload.connectTime ?? null);   // Connect
-        timelineChart.data.datasets[5].data.push(payload.domReady ?? null);      // DOM Ready
-        timelineChart.data.datasets[6].data.push(payload.loadComplete ?? null);  // Load Complete
-        timelineChart.data.datasets[7].data.push(payload.errorCount ?? 0);       // JS Errors
+        // Add each waterfall step to timeline
+        waterfallData.forEach(step => {
+            const offsetTime = new Date(baseTime.getTime() + (step.time * 1000));
+            const label = offsetTime.toLocaleTimeString();
+            
+            timelineChart.data.labels.push(label);
+            
+            // Add data points for each metric
+            timelineChart.data.datasets[0].data.push(step.lcp || null);           // LCP
+            timelineChart.data.datasets[1].data.push(step.fcp || null);           // FCP  
+            timelineChart.data.datasets[2].data.push(step.ttfb || null);          // TTFB
+            timelineChart.data.datasets[3].data.push(step.dns || null);           // DNS
+            timelineChart.data.datasets[4].data.push(step.connect || null);       // Connect
+            timelineChart.data.datasets[5].data.push(step.domReady || null);      // DOM Ready
+            timelineChart.data.datasets[6].data.push(step.loadComplete || null);  // Load Complete
+            timelineChart.data.datasets[7].data.push(payload.errorCount ?? 0);    // JS Errors
+        });
 
         // keep last 50 points to avoid memory bloat
-        const maxPoints = 50;
-        if (timelineChart.data.labels.length > maxPoints) {
+        const maxPoints = 100;
+        while (timelineChart.data.labels.length > maxPoints) {
             timelineChart.data.labels.shift();
             timelineChart.data.datasets.forEach(ds => ds.data.shift());
         }

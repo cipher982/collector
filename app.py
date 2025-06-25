@@ -234,12 +234,24 @@ def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
                 "fcp": vitals.get("FCP"),
                 "fid": vitals.get("FID"),
                 "cls": vitals.get("CLS"),
-                "ttfb": timing.get("responseStart"),
-                "dnsTime": timing.get("domainLookupEnd"),
-                "connectTime": timing.get("connectEnd"),
-                "responseTime": timing.get("responseEnd"),
-                "domReady": timing.get("domContentLoadedEventEnd"),
-                "loadComplete": timing.get("loadEventEnd"),
+                "ttfb": timing.get("responseStart") - timing.get("navigationStart", 0)
+                if timing.get("responseStart")
+                else None,
+                "dnsTime": timing.get("domainLookupEnd") - timing.get("domainLookupStart", 0)
+                if timing.get("domainLookupEnd") and timing.get("domainLookupStart")
+                else None,
+                "connectTime": timing.get("connectEnd") - timing.get("connectStart", 0)
+                if timing.get("connectEnd") and timing.get("connectStart")
+                else None,
+                "responseTime": timing.get("responseEnd") - timing.get("responseStart", 0)
+                if timing.get("responseEnd") and timing.get("responseStart")
+                else None,
+                "domReady": timing.get("domContentLoadedEventEnd") - timing.get("navigationStart", 0)
+                if timing.get("domContentLoadedEventEnd")
+                else None,
+                "loadComplete": timing.get("loadEventEnd") - timing.get("navigationStart", 0)
+                if timing.get("loadEventEnd")
+                else None,
                 "errorCount": len(data.get("errors", [])),
             },
         )

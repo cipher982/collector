@@ -652,7 +652,7 @@ const ui = {
                             color: cssVar('--c-grid')
                         },
                         ticks: {
-                            color: '#e0e0e0'
+                            color: cssVar('--win98-text')
                         }
                     },
                     x: {
@@ -660,14 +660,14 @@ const ui = {
                             color: cssVar('--c-grid')
                         },
                         ticks: {
-                            color: '#e0e0e0'
+                            color: cssVar('--win98-text')
                         }
                     }
                 },
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#e0e0e0'
+                            color: cssVar('--win98-text')
                         }
                     }
                 }
@@ -728,13 +728,13 @@ const ui = {
                     x: {
                         stacked: true,
                         grid: { color: cssVar('--c-grid') },
-                        ticks: { color: '#e0e0e0' },
-                        title: { display: true, text: 'ms', color: '#e0e0e0' },
+                        ticks: { color: cssVar('--win98-text') },
+                        title: { display: true, text: 'ms', color: cssVar('--win98-text') },
                     },
                     y: {
                         stacked: true,
                         grid: { color: cssVar('--c-grid') },
-                        ticks: { color: '#e0e0e0' },
+                        ticks: { color: cssVar('--win98-text') },
                     },
                 },
                 plugins: {
@@ -749,7 +749,7 @@ const ui = {
                         },
                     },
                     legend: {
-                        labels: { color: '#e0e0e0' },
+                        labels: { color: cssVar('--win98-text') },
                     },
                 },
             },
@@ -967,25 +967,25 @@ const ui = {
                 scales: {
                     y: {
                         position: 'left',
-                        title: { display: true, text: 'LCP (ms)', color: '#e0e0e0' },
+                        title: { display: true, text: 'LCP (ms)', color: cssVar('--win98-text') },
                         grid: { color: cssVar('--c-grid') },
-                        ticks: { color: '#e0e0e0' },
+                        ticks: { color: cssVar('--win98-text') },
                     },
                     y1: {
                         position: 'right',
-                        title: { display: true, text: 'Error count', color: '#e0e0e0' },
+                        title: { display: true, text: 'Error count', color: cssVar('--win98-text') },
                         grid: { drawOnChartArea: false },
                         min: 0,
-                        ticks: { color: '#e0e0e0', stepSize: 1 },
+                        ticks: { color: cssVar('--win98-text'), stepSize: 1 },
                     },
                     x: {
-                        ticks: { color: '#e0e0e0' },
+                        ticks: { color: cssVar('--win98-text') },
                         grid: { color: cssVar('--c-grid') },
                     },
                 },
                 plugins: {
                     legend: {
-                        labels: { color: '#e0e0e0' },
+                        labels: { color: cssVar('--win98-text') },
                     },
                 },
             },

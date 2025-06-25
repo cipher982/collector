@@ -9,6 +9,14 @@
   --win98-accent-light: #1084D0; /* Title bar gradient end */
   --win98-text: #000000;        /* Black text */
   --win98-white: #FFFFFF;       /* Pure white */
+  
+  /* Chart colors for Windows 98 theme */
+  --c-series-1: #0000FF;        /* Blue */
+  --c-series-2: #FF0000;        /* Red */
+  --c-accent-good: #008000;     /* Green */
+  --c-accent-info: #000080;     /* Navy */
+  --c-accent-neutral: #808080;  /* Gray */
+  --c-grid: #A0A0A0;           /* Grid lines */
 }
 
 /* CSS Reset */
@@ -102,7 +110,7 @@ button:active, .btn:active {
 
 /* Sunken containers (like chart areas) */
 .chart-container, pre {
-    background: var(--win98-white);
+    background: var(--win98-face);
     border: 2px solid;
     border-color: var(--win98-shadow) var(--win98-highlight) var(--win98-highlight) var(--win98-shadow);
     padding: 4px;
@@ -192,7 +200,7 @@ details summary {
 /* Canvas styling */
 canvas {
     border: 1px solid var(--win98-shadow);
-    background: var(--win98-white);
+    background: var(--win98-face);
 }
 
 /* Core Web Vitals - compact Windows 98 layout */

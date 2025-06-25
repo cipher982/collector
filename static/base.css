@@ -1,0 +1,336 @@
+/* Authentic Windows 98 Design System */
+
+/* Windows 98 Color Palette */
+:root {
+  --win98-face: #C3C3C3;        /* Main chrome/background */
+  --win98-shadow: #818181;      /* Dark shadow for beveling */
+  --win98-highlight: #FDFFFF;   /* Light highlight for beveling */
+  --win98-accent: #000080;      /* Navy blue accent */
+  --win98-accent-light: #1084D0; /* Title bar gradient end */
+  --win98-text: #000000;        /* Black text */
+  --win98-white: #FFFFFF;       /* Pure white */
+}
+
+/* CSS Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Crisp pixel rendering for authentic bitmap look */
+html {
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+    -moz-osx-font-smoothing: unset;
+}
+
+/* Base Windows 98 styling */
+html {
+    background: var(--win98-face);
+}
+
+body {
+    font-family: "MS Sans Serif", "Tahoma", system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--win98-text);
+    background: var(--win98-face);
+    padding: 4px;
+}
+
+/* Windows 98 window containers - every section gets its own window */
+.window, .metric-card, article, section {
+    background: var(--win98-face);
+    border: 2px solid;
+    border-color: var(--win98-highlight) var(--win98-shadow) var(--win98-shadow) var(--win98-highlight);
+    padding: 6px;
+    margin-bottom: 6px;
+    color: var(--win98-text);
+}
+
+/* Title bars with authentic gradient - ONLY for main title */
+.title-bar, header h1 {
+    background: linear-gradient(90deg, var(--win98-accent) 0%, var(--win98-accent-light) 100%);
+    color: var(--win98-white);
+    font-weight: bold;
+    padding: 2px 4px;
+    font-size: 11px;
+    margin: -6px -6px 4px -6px;
+    user-select: none;
+}
+
+/* Regular section headers - black text on gray */
+h1, h2 {
+    background: var(--win98-face);
+    color: var(--win98-text);
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 4px;
+    border: 1px solid;
+    border-color: var(--win98-highlight) var(--win98-shadow) var(--win98-shadow) var(--win98-highlight);
+    margin-bottom: 4px;
+}
+
+h3 {
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: var(--win98-text);
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* Windows 98 buttons */
+button, .btn {
+    background: var(--win98-face);
+    border: 2px solid;
+    border-color: var(--win98-highlight) var(--win98-shadow) var(--win98-shadow) var(--win98-highlight);
+    color: var(--win98-text);
+    padding: 2px 8px;
+    font: inherit;
+    cursor: default;
+    font-size: 11px;
+}
+
+button:active, .btn:active {
+    border-color: var(--win98-shadow) var(--win98-highlight) var(--win98-highlight) var(--win98-shadow);
+    background: #A9A9A9;
+}
+
+/* Sunken containers (like chart areas) */
+.chart-container, pre {
+    background: var(--win98-white);
+    border: 2px solid;
+    border-color: var(--win98-shadow) var(--win98-highlight) var(--win98-highlight) var(--win98-shadow);
+    padding: 4px;
+    margin: 8px 0;
+    height: 280px;
+}
+
+/* Pre/code styling */
+pre {
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    height: auto;
+}
+
+/* Windows 98 focus styles */
+*:focus-visible {
+    outline: 1px dotted var(--win98-accent);
+    outline-offset: -1px;
+}
+
+/* Status indicators - square Windows style */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid;
+    border-color: var(--win98-shadow) var(--win98-highlight) var(--win98-highlight) var(--win98-shadow);
+    margin-right: 6px;
+}
+
+.status-indicator.status-good {
+    background: #008000;
+}
+
+.status-indicator.status-warning {
+    background: #FFFF00;
+}
+
+.status-indicator.status-error {
+    background: #FF0000;
+}
+
+/* Layout - Compact Windows 98 approach */
+header {
+    margin-bottom: 4px;
+}
+
+section {
+    margin-bottom: 4px;
+}
+
+/* Two column layout - Windows 98 style */
+.two-col {
+    display: table;
+    width: 100%;
+    border-spacing: 8px 0;
+}
+
+.two-col > * {
+    display: table-cell;
+    width: 50%;
+    vertical-align: top;
+}
+
+/* Hero section layout */
+.hero {
+    display: table;
+    width: 100%;
+    border-spacing: 8px 0;
+}
+
+.hero > * {
+    display: table-cell;
+    vertical-align: top;
+}
+
+/* Details/Summary - Windows 98 style */
+details summary {
+    cursor: default;
+    font-weight: bold;
+    margin-bottom: 4px;
+    padding: 2px;
+}
+
+/* Canvas styling */
+canvas {
+    border: 1px solid var(--win98-shadow);
+    background: var(--win98-white);
+}
+
+/* Core Web Vitals - compact Windows 98 layout */
+#coreVitals {
+    display: block;
+}
+
+#coreVitals .metric-card {
+    padding: 2px;
+    margin-bottom: 2px;
+}
+
+/* Ensure small, fixed layouts */
+.hero > * {
+    min-width: 200px;
+    max-width: 320px;
+}
+
+/* Compact Windows 98 text */
+p {
+    margin-bottom: 2px;
+    font-size: 11px;
+    color: var(--win98-text);
+}
+
+/* Text styling */
+strong {
+    font-weight: bold;
+    color: var(--win98-text);
+}
+
+/* Window body content */
+.window-body {
+    padding: 2px;
+}
+
+/* Proper text color hierarchy */
+* {
+    color: var(--win98-text);
+}
+
+/* Specific element styling */
+.status-main-card {
+    flex: 2 1 320px;
+    min-width: 280px;
+}
+
+.status-side-card {
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+
+.memory-note {
+    display: none;
+    font-size: 9px;
+    color: var(--win98-text);
+    margin-top: 2px;
+}
+
+.ping-equalizer {
+    display: none;
+}
+
+.rtt-spark {
+    width: 100%;
+    margin-top: 4px;
+    background: var(--win98-white);
+    border-radius: 0;
+}
+
+.gpu-section {
+    align-items: stretch;
+}
+
+.gpu-section-header {
+    grid-column: 1 / -1;
+}
+
+.gpu-results-card {
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.gpu-results-text {
+    line-height: 1.2;
+}
+
+.gpu-demo-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.gpu-demo-container {
+    width: 100%;
+    max-height: 220px;
+    aspect-ratio: 16/9;
+    position: relative;
+}
+
+.fps-display {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    color: var(--win98-white);
+    font-weight: bold;
+    text-shadow: 0 0 2px var(--win98-text);
+    pointer-events: none;
+    font-size: 9px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    border: 0;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.gpu-demo-overlay::after {
+    content: 'Live GPU Demo';
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    font-weight: bold;
+    font-size: 9px;
+    color: var(--win98-white);
+    text-shadow: 0 0 2px var(--win98-text);
+    pointer-events: none;
+}
+
+.loading {
+    color: var(--win98-text);
+    font-style: italic;
+}

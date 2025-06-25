@@ -1089,91 +1089,122 @@ async function submitData(data) {
 
 
 // Main collection function
-async function collectData() {
+async function collectInitialData() {
     try {
-    const errors = collectors.setupErrorTracking();
+        const errors = collectors.setupErrorTracking();
 
-    const data = {
-        timestamp: new Date().toISOString(),
-        browser: collectors.getBrowserInfo(),
-        performance: collectors.getPerformanceData(),
-        fingerprints: {
+        const data = {
+            timestamp: new Date().toISOString(),
+            browser: collectors.getBrowserInfo(),
+            performance: collectors.getPerformanceData(),
+            network: {
+                ...collectors.getNetworkInfo(),
+                rttStats: collectors.getLiveRttStats(),
+            },
+            errors
+        };
+
+        // Capture Core Web Vitals before rendering UI; they resolve quickly
+        data.performance.webVitals = await collectors.getWebVitals();
+
+        // Render UI sections (each guarded so a failure in one does not block others)
+        const safeCall = (fn) => {
+            try {
+                fn();
+            } catch (err) {
+                console.error('Render error:', err);
+            }
+        };
+
+        [
+            ui.displaySystemStatus,
+            ui.displayBrowserInfo,
+            ui.displayPerformanceChart,
+            ui.displayWebVitals,
+            ui.displayWaterfallChart,
+            ui.displayDebugInfo,
+        ].forEach((fn) => safeCall(() => fn(data)));
+
+
+        // Expose globally for live update helpers
+        window.__currentDebugData = data;
+
+        // Collect deferred data after a short delay
+        setTimeout(() => collectDeferredData(data), 100);
+
+    } catch (err) {
+        console.error('collectInitialData failed', err);
+    }
+}
+
+async function collectDeferredData(data) {
+    try {
+        // Add fingerprinting data
+        data.fingerprints = {
             canvas: collectors.getCanvasFingerprint(),
             fonts: collectors.getFontFingerprint(),
             webgl: collectors.getWebGLInfo()
-        },
-        network: {
-            ...collectors.getNetworkInfo(),
-            rttStats: collectors.getLiveRttStats(),
-        },
-        battery: await collectors.getBatteryInfo(),
-        errors
-    };
+        };
 
-    // ------------------------------------------------------------------
-    // GPU micro-benchmarks (kick off async, update UI when done)
-    // ------------------------------------------------------------------
+        // Add battery data
+        data.battery = await collectors.getBatteryInfo();
 
-    data.benchmarks = { baselineFps: { available: false }, gpuTimer: { available: false } };
-    ui.displayGpuBenchmarks(data); // show immediate placeholder
+        // GPU micro-benchmarks (kick off async, update UI when done)
+        data.benchmarks = { baselineFps: { available: false }, gpuTimer: { available: false } };
+        ui.displayGpuBenchmarks(data); // show immediate placeholder
 
-    // Kick benchmarks in parallel but don't block main UI
-    Promise.all([
-        collectors.runBaselineFps(),
-        collectors.runGpuTimerQuery(),
-    ]).then(([fpsRes, gpuTimerRes]) => {
-        data.benchmarks.baselineFps = fpsRes;
-        data.benchmarks.gpuTimer = gpuTimerRes;
-        data.benchmarks.textureSupport = collectors.getTextureCompressionSupport();
-        ui.displayGpuBenchmarks(data);
-    });
+        // Kick benchmarks in parallel but don't block main UI
+        Promise.all([
+            collectors.runBaselineFps(),
+            collectors.runGpuTimerQuery(),
+        ]).then(([fpsRes, gpuTimerRes]) => {
+            data.benchmarks.baselineFps = fpsRes;
+            data.benchmarks.gpuTimer = gpuTimerRes;
+            data.benchmarks.textureSupport = collectors.getTextureCompressionSupport();
+            ui.displayGpuBenchmarks(data);
+        });
 
-    // Active network measurement (does 2 HTTP calls; non-blocking for UX)
-    try {
-        data.network.measured = await collectors.measureNetworkPerformance();
-    } catch {
-        // best-effort – ignore failures
-    }
-
-    // Capture Core Web Vitals before rendering UI; they resolve quickly
-    data.performance.webVitals = await collectors.getWebVitals();
-
-    // Render UI sections (each guarded so a failure in one does not block others)
-    const safeCall = (fn) => {
+        // Active network measurement (does 2 HTTP calls; non-blocking for UX)
         try {
-            fn();
-        } catch (err) {
-            console.error('Render error:', err);
+            data.network.measured = await collectors.measureNetworkPerformance();
+        } catch {
+            // best-effort – ignore failures
         }
-    };
 
-    [
-        ui.displaySystemStatus,
-        ui.displayBrowserInfo,
-        ui.displayPerformanceChart,
-        ui.displayFingerprints,
-        ui.displayWebVitals,
-        ui.displayWaterfallChart,
-        ui.displayDebugInfo,
-        ui.displayGpuBenchmarks,
-    ].forEach((fn) => safeCall(() => fn(data)));
+        // Update UI with the new data
+        const safeCall = (fn) => {
+            try {
+                fn();
+            } catch (err) {
+                console.error('Render error:', err);
+            }
+        };
 
+        [
+            ui.displayFingerprints,
+            ui.displayDebugInfo,
+        ].forEach((fn) => safeCall(() => fn(data)));
 
-    // Expose globally for live update helpers
-    window.__currentDebugData = data;
-
-    setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);
+        // Submit the final data
+        setTimeout(() => submitData(data), CONFIG.COLLECTION_DELAY);
 
     } catch (err) {
-        console.error('collectData failed', err);
+        console.error('collectDeferredData failed', err);
     }
 }
 
 // Initialize
 window.onload = () => {
-    collectData();
+    collectInitialData();
     initializeLiveUpdates();
-    ui.startGpuDemo?.();
+    const gpuDemoCard = document.getElementById('gpuDemoCard');
+    const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            ui.startGpuDemo?.();
+            observer.disconnect();
+        }
+    });
+    observer.observe(gpuDemoCard);
 
     // ------------------------------------------------------------------
     // Neon RTT sparkline ------------------------------------------------

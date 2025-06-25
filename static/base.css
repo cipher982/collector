@@ -72,6 +72,9 @@ body {
     font-size: 11px;
     margin: -6px -6px 4px -6px;
     user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 /* Regular section headers - black text on gray */
@@ -367,4 +370,8 @@ strong {
 .loading {
     color: var(--win98-text);
     font-style: italic;
+}
+
+.header-links {
+    margin-left: auto;
 }

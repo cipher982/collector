@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}">
 
     <!-- 3rd-party libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" defer></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" defer></script>
     <script src="https://unpkg.com/web-vitals@3/dist/web-vitals.iife.min.js" defer></script>
@@ -19,7 +19,12 @@
          Header
     ------------------------------------------------------------------ -->
     <header>
-        <h1>Browser Fingerprinting Demo</h1>
+        <h1>
+            Browser Fingerprinting Demo
+            <div class="header-links">
+                <a href="https://github.com/cipher982/collector" target="_blank" class="btn">GitHub</a>
+            </div>
+        </h1>
         <p>Real-time browser fingerprinting metrics and system information dashboard.</p>
     </header>
 

@@ -68,8 +68,8 @@ body {
     background: linear-gradient(90deg, var(--win98-accent) 0%, var(--win98-accent-light) 100%);
     color: var(--win98-white);
     font-weight: bold;
-    padding: 2px 4px;
-    font-size: 11px;
+    padding: 14px 8px;
+    font-size: 14px;
     margin: -6px -6px 4px -6px;
     user-select: none;
     display: flex;
@@ -105,7 +105,7 @@ button, .btn {
     border: 2px solid;
     border-color: var(--win98-highlight) var(--win98-shadow) var(--win98-shadow) var(--win98-highlight);
     color: var(--win98-text);
-    padding: 2px 8px;
+    padding: 4px 8px;
     font: inherit;
     cursor: default;
     font-size: 11px;

@@ -1139,9 +1139,9 @@ window.onload = () => {
                     {
                         label: 'Latency',
                         data: [],
-                        borderColor: css('--c-accent-info'),
-                        backgroundColor: css('--c-accent-info', 0.15),
-                        borderWidth: 1.5,
+                        borderColor: css('--taskman-green'),
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
                         pointRadius: 0,
                         tension: 0.3,
                         fill: false,
@@ -1159,7 +1159,7 @@ window.onload = () => {
                         borderColor: 'rgba(0,0,0,0)',
                         pointRadius: 0,
                         fill: { target: 1 }, // fill area to the upper dataset
-                        backgroundColor: css('--c-accent-neutral', 0.25),
+                        backgroundColor: css('--taskman-grid', 0.15),
                     },
                 ],
             },
@@ -1190,15 +1190,19 @@ window.onload = () => {
     }
 
     // ------------------------------------------------------------------
-    // Sampling interval – how frequently we poll <ping-eq> for new latency
-    // values and push them into the spark-line chart.  halved from 1000 →
-    // 500 ms (2 samples / s) to make the graph move twice as fast.
+    // Adaptive sampling interval – start fast (5x speed) to fill chart quickly,
+    // then slow down to normal speed for steady state
     // ------------------------------------------------------------------
 
-    const SAMPLE_INTERVAL_MS = 500; // 2× faster than before
+    const NORMAL_INTERVAL_MS = 500;  // Normal speed: 2 samples/sec
+    const FAST_INTERVAL_MS = 100;    // Fast speed: 10 samples/sec (5x faster)
+    const CHART_CAPACITY = 120;      // Must match CAP above
+    
+    let currentInterval = FAST_INTERVAL_MS;
+    let sampleCount = 0;
+    let intervalId;
 
-    // Push new RTT sample every SAMPLE_INTERVAL_MS for sparkline
-    setInterval(() => {
+    function updateRTTChart() {
         if (!rttChart) return;
         const el = document.getElementById('pingBars');
         if (!el || typeof el.getLastSample !== 'function') return;
@@ -1211,6 +1215,13 @@ window.onload = () => {
 
         const upper = sample + jitter;
         const lower = Math.max(0, sample - jitter);
+
+        // Skip first 5 samples entirely - don't add them to chart
+        const SKIP_FIRST_SAMPLES = 5;
+        if (sampleCount < SKIP_FIRST_SAMPLES) {
+            sampleCount++;
+            return; // Skip this sample completely
+        }
 
         const tsLabel = new Date().toLocaleTimeString();
         const { labels, datasets } = rttChart.data;
@@ -1238,27 +1249,25 @@ window.onload = () => {
         // full two-minute history.
         // ------------------------------------------------------------------
 
-        const SAMPLES_PER_SEC = 1000 / SAMPLE_INTERVAL_MS; // 2 with 500 ms
+        const SAMPLES_PER_SEC = 1000 / currentInterval;
 
         const WARMUP_SAMPLES = Math.round(5 * SAMPLES_PER_SEC);   // ignore first 5 s
         const WINDOW_SIZE    = Math.round(30 * SAMPLES_PER_SEC);  // 30 s window
 
-        // Build a view onto the active data, excluding warm-up region and
-        // limiting to the sliding window.
+        // Build a view onto the actual latency data for scaling (first 5 samples already excluded from chart)
         const total = labels.length;
         const startIdx = Math.max(WARMUP_SAMPLES, total - WINDOW_SIZE);
 
-        const windowUpper = datasets[1].data.slice(startIdx);
-        const windowLower = datasets[2].data.slice(startIdx);
-        const windowVals  = [...windowUpper, ...windowLower];
-
-        // Fallback safety – if we do not have enough points yet, resort to
-        // whatever values are present so the chart is not blank.
-        const safeVals = windowVals.length ? windowVals : [...datasets[1].data, ...datasets[2].data];
+        // Scale based on actual latency values (dataset[0]), not jitter bands
+        const windowLatency = datasets[0].data.slice(startIdx);
+        
+        // Fallback to all available latency data if not enough for windowing
+        const safeVals = windowLatency.length ? windowLatency : datasets[0].data;
 
         let maxVal = 100;
         let minVal = 0;
 
+        // Use dynamic scaling based on available data
         if (safeVals.length) {
             maxVal = Math.max(...safeVals);
             minVal = Math.min(...safeVals);
@@ -1269,7 +1278,19 @@ window.onload = () => {
         rttChart.options.scales.y.max = Math.ceil(maxVal + padding);
 
         rttChart.update('none');
-    }, 1000);
+        
+        // Track sample count and switch to normal speed when chart is full
+        sampleCount++;
+        if (sampleCount >= CHART_CAPACITY && currentInterval === FAST_INTERVAL_MS) {
+            clearInterval(intervalId);
+            currentInterval = NORMAL_INTERVAL_MS;
+            intervalId = setInterval(updateRTTChart, currentInterval);
+            console.log('RTT chart filled - switching to normal speed');
+        }
+    }
+
+    // Start with fast interval to fill chart quickly
+    intervalId = setInterval(updateRTTChart, currentInterval);
 
     // ------------------------------------------------------------------
     // Periodically refresh the Network chip with live RTT / jitter stats.

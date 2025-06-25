@@ -310,6 +310,7 @@ strong {
 
 .gpu-results-text {
     line-height: 1.2;
+    color: var(--win98-white);
 }
 
 .gpu-demo-card {
@@ -328,11 +329,14 @@ strong {
     position: absolute;
     top: 4px;
     left: 4px;
-    color: var(--win98-white);
+    color: var(--taskman-green);
     font-weight: bold;
-    text-shadow: 0 0 2px var(--win98-text);
     pointer-events: none;
     font-size: 9px;
+}
+
+#fpsValue {
+    color: var(--taskman-green);
 }
 
 .visually-hidden {

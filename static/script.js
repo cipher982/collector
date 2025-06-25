@@ -948,35 +948,102 @@ const ui = {
                     {
                         label: 'LCP (ms)',
                         data: [],
-                        borderColor: cssVarAlpha('--c-accent-good', 0.8),
-                        backgroundColor: cssVarAlpha('--c-accent-good', 0.3),
+                        borderColor: cssVarAlpha('--c-accent-good', 0.9),
+                        backgroundColor: cssVarAlpha('--c-accent-good', 0.2),
                         tension: 0.3,
                         yAxisID: 'y',
+                        fill: true,
+                    },
+                    {
+                        label: 'FCP (ms)',
+                        data: [],
+                        borderColor: cssVarAlpha('--c-series-1', 0.9),
+                        backgroundColor: cssVarAlpha('--c-series-1', 0.2),
+                        tension: 0.3,
+                        yAxisID: 'y',
+                        fill: false,
+                    },
+                    {
+                        label: 'TTFB (ms)',
+                        data: [],
+                        borderColor: cssVarAlpha('--c-accent-info', 0.9),
+                        backgroundColor: cssVarAlpha('--c-accent-info', 0.2),
+                        tension: 0.2,
+                        yAxisID: 'y2',
+                        borderDash: [5, 5],
+                    },
+                    {
+                        label: 'DNS (ms)',
+                        data: [],
+                        borderColor: cssVarAlpha('--taskman-green', 0.8),
+                        backgroundColor: cssVarAlpha('--taskman-green', 0.1),
+                        tension: 0.1,
+                        yAxisID: 'y2',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Connect (ms)',
+                        data: [],
+                        borderColor: '#FF6B35',
+                        backgroundColor: '#FF6B3520',
+                        tension: 0.2,
+                        yAxisID: 'y2',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'DOM Ready (ms)',
+                        data: [],
+                        borderColor: '#9B59B6',
+                        backgroundColor: '#9B59B620',
+                        tension: 0.3,
+                        yAxisID: 'y',
+                        borderDash: [3, 3],
+                    },
+                    {
+                        label: 'Load Complete (ms)',
+                        data: [],
+                        borderColor: '#E67E22',
+                        backgroundColor: '#E67E2220',
+                        tension: 0.3,
+                        yAxisID: 'y',
+                        borderDash: [10, 2],
                     },
                     {
                         label: 'JS Errors',
                         data: [],
                         type: 'bar',
-                        backgroundColor: cssVarAlpha('--c-series-2', 0.7),
+                        backgroundColor: cssVarAlpha('--c-series-2', 0.8),
                         yAxisID: 'y1',
+                        barThickness: 'flex',
                     },
                 ],
             },
             options: {
                 responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 scales: {
                     y: {
                         position: 'left',
-                        title: { display: true, text: 'LCP (ms)', color: cssVar('--win98-text') },
+                        title: { display: true, text: 'Core Web Vitals (ms)', color: cssVar('--win98-text') },
                         grid: { color: cssVar('--c-grid') },
                         ticks: { color: cssVar('--win98-text') },
                     },
                     y1: {
                         position: 'right',
-                        title: { display: true, text: 'Error count', color: cssVar('--win98-text') },
+                        title: { display: true, text: 'Errors', color: cssVar('--win98-text') },
                         grid: { drawOnChartArea: false },
                         min: 0,
                         ticks: { color: cssVar('--win98-text'), stepSize: 1 },
+                    },
+                    y2: {
+                        position: 'right',
+                        title: { display: true, text: 'Network Timing (ms)', color: cssVar('--win98-text') },
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: cssVar('--win98-text') },
+                        offset: true,
                     },
                     x: {
                         ticks: { color: cssVar('--win98-text') },
@@ -985,7 +1052,15 @@ const ui = {
                 },
                 plugins: {
                     legend: {
-                        labels: { color: cssVar('--win98-text') },
+                        labels: { color: cssVar('--win98-text'), usePointStyle: true },
+                        position: 'top',
+                    },
+                    tooltip: {
+                        backgroundColor: cssVar('--win98-face'),
+                        titleColor: cssVar('--win98-text'),
+                        bodyColor: cssVar('--win98-text'),
+                        borderColor: cssVar('--win98-shadow'),
+                        borderWidth: 1,
                     },
                 },
             },
@@ -1340,8 +1415,14 @@ function initializeLiveUpdates() {
         const label = new Date(payload.timestamp).toLocaleTimeString();
 
         timelineChart.data.labels.push(label);
-        timelineChart.data.datasets[0].data.push(payload.lcp ?? null);
-        timelineChart.data.datasets[1].data.push(payload.errorCount ?? 0);
+        timelineChart.data.datasets[0].data.push(payload.lcp ?? null);           // LCP
+        timelineChart.data.datasets[1].data.push(payload.fcp ?? null);           // FCP
+        timelineChart.data.datasets[2].data.push(payload.ttfb ?? null);          // TTFB
+        timelineChart.data.datasets[3].data.push(payload.dnsTime ?? null);       // DNS
+        timelineChart.data.datasets[4].data.push(payload.connectTime ?? null);   // Connect
+        timelineChart.data.datasets[5].data.push(payload.domReady ?? null);      // DOM Ready
+        timelineChart.data.datasets[6].data.push(payload.loadComplete ?? null);  // Load Complete
+        timelineChart.data.datasets[7].data.push(payload.errorCount ?? 0);       // JS Errors
 
         // keep last 50 points to avoid memory bloat
         const maxPoints = 50;

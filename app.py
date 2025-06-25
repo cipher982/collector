@@ -224,13 +224,22 @@ def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
 
         # Push a lightweight update to real-time dashboards.
         vitals = data.get("performance", {}).get("webVitals", {})
+        timing = data.get("performance", {}).get("timing", {})
+
         _socket_emit(
             "new_payload",
             {
                 "timestamp": data.get("timestamp"),
                 "lcp": vitals.get("LCP"),
+                "fcp": vitals.get("FCP"),
                 "fid": vitals.get("FID"),
                 "cls": vitals.get("CLS"),
+                "ttfb": timing.get("responseStart"),
+                "dnsTime": timing.get("domainLookupEnd"),
+                "connectTime": timing.get("connectEnd"),
+                "responseTime": timing.get("responseEnd"),
+                "domReady": timing.get("domContentLoadedEventEnd"),
+                "loadComplete": timing.get("loadEventEnd"),
                 "errorCount": len(data.get("errors", [])),
             },
         )

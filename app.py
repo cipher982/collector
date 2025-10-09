@@ -152,7 +152,25 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure base path for subdirectory deployment (e.g., drose.io/collector)
-app.config["APPLICATION_ROOT"] = os.environ.get("APPLICATION_ROOT", "/")
+APPLICATION_ROOT = os.environ.get("APPLICATION_ROOT", "/")
+app.config["APPLICATION_ROOT"] = APPLICATION_ROOT
+
+
+# Middleware to handle subdirectory routing - adds SCRIPT_NAME to WSGI environ
+# so url_for() generates URLs with the correct prefix
+class PrefixMiddleware:
+    def __init__(self, app, prefix=""):
+        self.app = app
+        self.prefix = prefix.rstrip("/")
+
+    def __call__(self, environ, start_response):
+        if self.prefix:
+            environ["SCRIPT_NAME"] = self.prefix
+        return self.app(environ, start_response)
+
+
+if APPLICATION_ROOT != "/":
+    app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix=APPLICATION_ROOT)
 
 # Thread-based async mode works out-of-the-box (no eventlet/gevent needed)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")

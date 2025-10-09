@@ -151,6 +151,9 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# Configure base path for subdirectory deployment (e.g., drose.io/collector)
+app.config["APPLICATION_ROOT"] = os.environ.get("APPLICATION_ROOT", "/")
+
 # Thread-based async mode works out-of-the-box (no eventlet/gevent needed)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 

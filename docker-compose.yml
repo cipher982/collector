@@ -1,8 +1,8 @@
 services:
   web:
     build: .
-    ports:
-      - "5001:5000"
+    expose:
+      - "5000"
     networks:
       - coolify
     healthcheck:

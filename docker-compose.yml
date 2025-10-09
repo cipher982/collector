@@ -1,6 +1,7 @@
 services:
-  web:
+  collector-web:
     build: .
+    container_name: collector-web-server
     expose:
       - "5000"
     networks:

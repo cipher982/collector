@@ -157,6 +157,52 @@ class _Database:
         except RuntimeError:
             logger.debug("Insert skipped – database not configured.")
 
+    def insert_event(
+        self,
+        *,
+        client_timestamp: str | None = None,
+        visitor_id: str,
+        session_id: str,
+        pageview_id: str,
+        event_type: str,
+        seq: int = 0,
+        path: str | None = None,
+        referrer: str | None = None,
+        ip_hash: str | None = None,
+        user_agent: str | None = None,
+        payload: dict | None = None,
+    ) -> None:
+        """Persist a single event into *collector_events* table."""
+
+        try:
+            sql = (
+                "INSERT INTO collector_events (client_timestamp, visitor_id, session_id, "
+                "pageview_id, event_type, seq, path, referrer, ip_hash, user_agent, payload) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            )
+
+            with self.get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        sql,
+                        (
+                            client_timestamp,
+                            visitor_id,
+                            session_id,
+                            pageview_id,
+                            event_type,
+                            seq,
+                            path,
+                            referrer,
+                            ip_hash,
+                            user_agent,
+                            Json(payload or {}),
+                        ),
+                    )
+                    conn.commit()
+        except RuntimeError:
+            logger.debug("Insert skipped – database not configured.")
+
 
 # -------------------------------------------------------------------------
 # Public singleton instance
@@ -183,3 +229,4 @@ def init() -> None:
 # Re-export frequently used helpers for terser imports in other modules.
 get_conn = db.get_conn
 insert_debug_record = db.insert_debug_record
+insert_event = db.insert_event

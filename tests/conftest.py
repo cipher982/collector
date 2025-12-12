@@ -21,14 +21,12 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # Ensure *flask_socketio* is importable even when the real library isn't
-# present in the minimal CI environment.  The application requires the actual
-# dependency in production, but for unit tests we can get away with a stub
-# exposing just *SocketIO.emit* and *SocketIO.run* so that `import app` does
-# not fail.
+# present in the minimal CI environment.
 # ---------------------------------------------------------------------------
 
-
-if "flask_socketio" not in sys.modules:
+try:
+    import flask_socketio  # noqa: F401
+except ModuleNotFoundError:
     fake_mod = ModuleType("flask_socketio")
 
     class _FakeSocketIO:  # noqa: D401 – minimal subset for tests
@@ -40,6 +38,12 @@ if "flask_socketio" not in sys.modules:
 
         def run(self, *_, **__):
             pass
+
+        def on(self, _event):  # noqa: D401 – decorator shim used by app.py
+            def decorator(func):  # noqa: D401
+                return func
+
+            return decorator
 
     fake_mod.SocketIO = _FakeSocketIO  # type: ignore[attr-defined]
     sys.modules["flask_socketio"] = fake_mod
@@ -73,9 +77,13 @@ def _patch_db() -> None:  # noqa: D401 – autouse fixture
 
     # Accumulate inserted rows here so tests can introspect.
     _records: List[dict[str, Any]] = []
+    _event_records: List[dict[str, Any]] = []
 
     def fake_insert_debug_record(**kwargs):  # type: ignore[override]
         _records.append(kwargs)
+
+    def fake_insert_event(**kwargs):  # type: ignore[override]
+        _event_records.append(kwargs)
 
     @contextmanager
     def fake_get_conn() -> Generator[None, None, None]:  # type: ignore[override]
@@ -85,9 +93,11 @@ def _patch_db() -> None:  # noqa: D401 – autouse fixture
         pass  # no-op
 
     db.insert_debug_record = fake_insert_debug_record  # type: ignore[attr-defined]
+    db.insert_event = fake_insert_event  # type: ignore[attr-defined]
     db.get_conn = fake_get_conn  # type: ignore[attr-defined]
     db.init = fake_init  # type: ignore[attr-defined]
     db._records = _records  # type: ignore[attr-defined]
+    db._event_records = _event_records  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@
 const CONFIG = {
     COLLECTION_DELAY: 3000,
     ENDPOINT: "/collect",
+    EVENTS_ENDPOINT: "/event",
+    EVENTS_ENABLED: Boolean(window.COLLECTOR_EVENTS_ENABLED),
 };
 
 // ------------------------------------------------------------------
@@ -47,6 +49,58 @@ function getSessionId() {
 
 function createPageviewId() {
     return randomId("p");
+}
+
+// ------------------------------------------------------------------
+// Event stream (Phase 3, Option B)
+// ------------------------------------------------------------------
+
+// Ensure a stable pageview_id exists as early as possible (even before
+// collectors.setupErrorTracking installs window.onerror).
+window.__collectorPageviewId = window.__collectorPageviewId || createPageviewId();
+
+const __eventState = {
+    pageviewSeq: 0,
+    lastWebVitalsEmitAt: 0,
+};
+
+function emitEvent(event_type, { payload = {}, path = null, referrer = null, client_timestamp = null } = {}) {
+    try {
+        if (!CONFIG.EVENTS_ENABLED) return;
+
+        __eventState.pageviewSeq += 1;
+
+        window.__collectorPageviewId = window.__collectorPageviewId || createPageviewId();
+
+        const body = {
+            visitor_id: getVisitorId(),
+            session_id: getSessionId(),
+            pageview_id: window.__collectorPageviewId,
+            event_type,
+            seq: __eventState.pageviewSeq,
+            client_timestamp: client_timestamp || new Date().toISOString(),
+            path: path ?? window.location.pathname,
+            referrer: referrer ?? (document.referrer || null),
+            payload: payload && typeof payload === "object" ? payload : {},
+        };
+
+        const json = JSON.stringify(body);
+
+        if (navigator.sendBeacon) {
+            const blob = new Blob([json], { type: "application/json" });
+            navigator.sendBeacon(CONFIG.EVENTS_ENDPOINT, blob);
+            return;
+        }
+
+        fetch(CONFIG.EVENTS_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: json,
+            keepalive: true,
+        }).catch(() => {});
+    } catch {
+        // fire-and-forget: swallow
+    }
 }
 
 // ------------------------------------------------------------------
@@ -225,13 +279,27 @@ const collectors = {
     setupErrorTracking() {
         const errors = [];
         window.onerror = (message, source, lineno, colno, error) => {
-            errors.push({
+            const errObj = {
                 message,
                 source,
                 lineno,
                 colno,
                 stack: error?.stack,
                 timestamp: new Date().toISOString()
+            };
+            errors.push(errObj);
+
+            const stack = typeof errObj.stack === "string" ? errObj.stack.slice(0, 2000) : errObj.stack;
+            const msg = typeof errObj.message === "string" ? errObj.message.slice(0, 500) : errObj.message;
+            emitEvent("error", {
+                client_timestamp: errObj.timestamp,
+                payload: {
+                    message: msg,
+                    source: errObj.source,
+                    lineno: errObj.lineno,
+                    colno: errObj.colno,
+                    stack,
+                },
             });
         };
         return errors;
@@ -313,6 +381,14 @@ const collectors = {
             if (dbg?.performance?.webVitals) {
                 dbg.performance.webVitals[name] = value;
                 ui.displayWebVitals(dbg);
+            }
+
+            const now = Date.now();
+            if (now - __eventState.lastWebVitalsEmitAt >= 1000) {
+                __eventState.lastWebVitalsEmitAt = now;
+                emitEvent("webvitals", {
+                    payload: { [name]: value },
+                });
             }
         };
 
@@ -1141,7 +1217,7 @@ async function collectInitialData() {
         const data = {
             visitor_id: getVisitorId(),
             session_id: getSessionId(),
-            pageview_id: createPageviewId(),
+            pageview_id: window.__collectorPageviewId,
             timestamp: new Date().toISOString(),
             browser: collectors.getBrowserInfo(),
             performance: collectors.getPerformanceData(),
@@ -1151,6 +1227,18 @@ async function collectInitialData() {
             },
             errors
         };
+
+        emitEvent("pageview", {
+            client_timestamp: data.timestamp,
+            payload: {
+                userAgent: data.browser.userAgent,
+                language: data.browser.language,
+                platform: data.browser.platform,
+                screenResolution: data.browser.screenResolution,
+                hardwareConcurrency: data.browser.hardwareConcurrency,
+                deviceMemory: data.browser.deviceMemory,
+            },
+        });
 
         // Capture Core Web Vitals before rendering UI; they resolve quickly
         data.performance.webVitals = await collectors.getWebVitals();
@@ -1194,6 +1282,10 @@ async function collectDeferredData(data) {
             webgl: collectors.getWebGLInfo()
         };
 
+        emitEvent("fingerprint_ready", {
+            payload: { fingerprints: data.fingerprints },
+        });
+
         // Add battery data
         data.battery = await collectors.getBatteryInfo();
 
@@ -1218,6 +1310,15 @@ async function collectDeferredData(data) {
         } catch {
             // best-effort – ignore failures
         }
+
+        emitEvent("performance_snapshot", {
+            payload: {
+                performance: data.performance,
+                network: data.network,
+                battery: data.battery,
+                benchmarks: data.benchmarks,
+            },
+        });
 
         // Update UI with the new data
         const safeCall = (fn) => {

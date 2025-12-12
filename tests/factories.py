@@ -35,3 +35,19 @@ def sample_payload() -> Dict[str, Any]:
         },
         "errors": [],
     }
+
+
+def sample_event() -> Dict[str, Any]:
+    """Return a minimally valid /event payload."""
+
+    return {
+        "visitor_id": "v_test",
+        "session_id": "s_test",
+        "pageview_id": "p_test",
+        "event_type": "pageview",
+        "seq": 1,
+        "client_timestamp": "2025-01-01T00:00:00Z",
+        "path": "/",
+        "referrer": None,
+        "payload": {"k": "v"},
+    }

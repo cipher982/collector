@@ -34,6 +34,8 @@ ENVIRONMENT & CONFIGURATION
 The application reads configuration from environment variables (via a `.env` file in development):
 
   DB_URL    — PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/dbname`)
+  COLLECTOR_EVENTS_ENABLED — Enable/disable client event emission (missing env defaults to enabled)
+  EVENT_IP_HASH_SALT — Salt used to compute `ip_hash` for events (when missing, `ip_hash` is stored as NULL)
 
 The Flask app uses `DB_URL` to initialize the `debug_data` table on startup (unless `--skip-db` is passed) and to insert new records on each `/collect` request.
 
@@ -63,7 +65,23 @@ Running Locally without Docker
 APPLICATION ENDPOINTS
 - GET  /          — Serves the dashboard (index.html)
 - POST /collect   — Receives JSON payload with browser, performance, fingerprint and error data; stores it and returns the same payload as JSON
+- POST /event     — Receives a single event and appends it to `collector_events` (rejects bodies > 256KB)
 - GET  /health    — Returns `{ status: "healthy", database: "connected" }` if DB connection succeeds, otherwise an error
+
+POST /event (example)
+```json
+{
+  "visitor_id": "v_...",
+  "session_id": "s_...",
+  "pageview_id": "p_...",
+  "event_type": "pageview",
+  "seq": 1,
+  "client_timestamp": "2025-01-01T00:00:00Z",
+  "path": "/",
+  "referrer": null,
+  "payload": { "k": "v" }
+}
+```
 
 DATABASE MIGRATIONS
 The application uses a simple SQL migration system (no heavy dependencies like Alembic). Migrations are tracked and applied automatically on startup.
@@ -97,6 +115,82 @@ Table: debug_data
 - timestamp         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
 The schema is managed by SQL migrations in the `migrations/` directory. See `MIGRATIONS.md` for details.  
+
+Table: collector_events
+- id                BIGSERIAL PRIMARY KEY
+- received_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+- client_timestamp   TIMESTAMPTZ
+- visitor_id         TEXT NOT NULL
+- session_id         TEXT NOT NULL
+- pageview_id        TEXT NOT NULL
+- event_type         TEXT NOT NULL
+- seq                INTEGER NOT NULL DEFAULT 0
+- path               TEXT
+- referrer           TEXT
+- ip_hash            TEXT
+- user_agent         TEXT
+- payload            JSONB NOT NULL DEFAULT '{}'::jsonb
+
+Example queries
+```sql
+-- Visitor journey
+SELECT received_at, event_type, path, payload
+FROM collector_events
+WHERE visitor_id = 'v_...'
+ORDER BY received_at ASC;
+
+-- Session timeline
+SELECT received_at, event_type, path, payload
+FROM collector_events
+WHERE session_id = 's_...'
+ORDER BY received_at ASC;
+
+-- Pageview reconstruction
+SELECT seq, received_at, event_type, payload
+FROM collector_events
+WHERE pageview_id = 'p_...'
+ORDER BY seq ASC;
+
+-- Counts/day (pageviews)
+SELECT date_trunc('day', received_at) AS day, count(*) AS pageviews
+FROM collector_events
+WHERE event_type = 'pageview'
+GROUP BY 1
+ORDER BY 1;
+
+-- Visitors/day (approx via pageview events)
+SELECT date_trunc('day', received_at) AS day, count(DISTINCT visitor_id) AS visitors
+FROM collector_events
+WHERE event_type = 'pageview'
+GROUP BY 1
+ORDER BY 1;
+
+-- Sessions/day (approx via pageview events)
+SELECT date_trunc('day', received_at) AS day, count(DISTINCT session_id) AS sessions
+FROM collector_events
+WHERE event_type = 'pageview'
+GROUP BY 1
+ORDER BY 1;
+
+-- Perf by browser (coarse UA family, from webvitals payload)
+SELECT
+  CASE
+    WHEN user_agent ILIKE '%Chrome/%' AND user_agent NOT ILIKE '%Edg/%' THEN 'Chrome'
+    WHEN user_agent ILIKE '%Edg/%' THEN 'Edge'
+    WHEN user_agent ILIKE '%Firefox/%' THEN 'Firefox'
+    WHEN user_agent ILIKE '%Safari/%' AND user_agent NOT ILIKE '%Chrome/%' THEN 'Safari'
+    ELSE 'Other'
+  END AS browser_family,
+  count(*) AS n_events,
+  avg((payload->>'LCP')::double precision) AS avg_lcp,
+  avg((payload->>'FCP')::double precision) AS avg_fcp,
+  avg((payload->>'FID')::double precision) AS avg_fid,
+  avg((payload->>'CLS')::double precision) AS avg_cls
+FROM collector_events
+WHERE event_type = 'webvitals'
+GROUP BY 1
+ORDER BY n_events DESC;
+```
 
 EXTENDING THE APP
 - Add new metrics in `static/script.js` under the `collectors` object and update UI rendering functions in the `ui` object.  

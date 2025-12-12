@@ -14,8 +14,10 @@ from __future__ import annotations
 # precede several local imports.
 
 import argparse
+import hashlib
 import logging
 import os
+import json
 import socket
 from typing import Any, Dict
 
@@ -131,7 +133,7 @@ if not hasattr(SocketIO, "on"):
 
     SocketIO.on = _noop_on  # type: ignore[attr-defined]
 
-from db import get_conn, insert_debug_record
+from db import get_conn, insert_debug_record, insert_event
 from db import init as init_db
 
 # ---------------------------------------------------------------------------
@@ -237,6 +239,28 @@ def get_client_ip() -> str:
     return request.remote_addr or ""
 
 
+def _events_enabled() -> bool:
+    """Return whether client/server event stream is enabled.
+
+    Missing env defaults to enabled (prod-friendly), explicit false disables.
+    """
+
+    val = os.getenv("COLLECTOR_EVENTS_ENABLED")
+    if val is None:
+        return True
+    return val.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _compute_ip_hash(*, ip: str, salt: str | None) -> str | None:
+    if not salt:
+        return None
+    if not ip:
+        return None
+    h = hashlib.sha256()
+    h.update(f"{ip}{salt}".encode("utf-8"))
+    return h.hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -244,7 +268,71 @@ def get_client_ip() -> str:
 
 @app.route("/")
 def index():  # noqa: D401 – Flask view
-    return render_template("index.html")
+    return render_template("index.html", collector_events_enabled=_events_enabled())
+
+
+@app.route("/event", methods=["POST"])
+def event() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
+    """Receive a single event payload and append to collector_events.
+
+    Rejects request bodies larger than 256KB.
+    """
+
+    max_bytes = 256 * 1024
+    raw_len = request.content_length
+    if raw_len is not None and raw_len > max_bytes:
+        return jsonify({"message": "Payload too large"}), 413
+
+    # If Content-Length is absent, enforce cap by reading bytes first.
+    raw_body: bytes | None = None
+    if raw_len is None:
+        try:
+            raw_body = request.get_data(cache=False) or b""
+        except Exception:
+            return jsonify({"message": "Payload too large"}), 413
+        if len(raw_body) > max_bytes:
+            return jsonify({"message": "Payload too large"}), 413
+
+    try:
+        if raw_body is not None:
+            data = json.loads(raw_body.decode("utf-8") or "{}")
+        else:
+            data = request.get_json(force=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"message": "Invalid JSON"}), 400
+    except Exception:
+        return jsonify({"message": "Invalid JSON"}), 400
+
+    required = ("visitor_id", "session_id", "pageview_id", "event_type")
+    missing = [k for k in required if not data.get(k)]
+    if missing:
+        return jsonify({"message": "Missing required fields", "missing": missing}), 400
+
+    seq_val = data.get("seq", 0)
+    if seq_val is None:
+        seq_val = 0
+    if isinstance(seq_val, bool) or not isinstance(seq_val, int):
+        return jsonify({"message": "seq must be an integer"}), 400
+
+    ip = get_client_ip()
+    salt = os.getenv("EVENT_IP_HASH_SALT")
+    ip_hash = _compute_ip_hash(ip=ip, salt=salt)
+
+    insert_event(
+        client_timestamp=data.get("client_timestamp"),
+        visitor_id=str(data["visitor_id"]),
+        session_id=str(data["session_id"]),
+        pageview_id=str(data["pageview_id"]),
+        event_type=str(data["event_type"]),
+        seq=seq_val,
+        path=data.get("path"),
+        referrer=data.get("referrer"),
+        ip_hash=ip_hash,
+        user_agent=request.headers.get("User-Agent"),
+        payload=data.get("payload") if isinstance(data.get("payload"), dict) else {},
+    )
+
+    return jsonify({"status": "ok"}), 200
 
 
 @app.route("/collect", methods=["POST"])

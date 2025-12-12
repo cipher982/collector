@@ -264,6 +264,9 @@ def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
             battery=data.get("battery"),
             benchmarks=data.get("benchmarks"),
             client_timestamp=data.get("timestamp"),
+            visitor_id=data.get("visitor_id"),
+            session_id=data.get("session_id"),
+            pageview_id=data.get("pageview_id"),
         )
 
         # Push a lightweight update to real-time dashboards.

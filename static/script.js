@@ -5,6 +5,51 @@ const CONFIG = {
 };
 
 // ------------------------------------------------------------------
+// Identity helpers (Phase 2: journeys)
+// ------------------------------------------------------------------
+
+function randomId(prefix) {
+    try {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+        return `${prefix}_${hex}`;
+    } catch {
+        return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+    }
+}
+
+function getVisitorId() {
+    const key = "collector.visitor_id";
+    try {
+        const existing = localStorage.getItem(key);
+        if (existing) return existing;
+        const created = randomId("v");
+        localStorage.setItem(key, created);
+        return created;
+    } catch {
+        return randomId("v");
+    }
+}
+
+function getSessionId() {
+    const key = "collector.session_id";
+    try {
+        const existing = sessionStorage.getItem(key);
+        if (existing) return existing;
+        const created = randomId("s");
+        sessionStorage.setItem(key, created);
+        return created;
+    } catch {
+        return randomId("s");
+    }
+}
+
+function createPageviewId() {
+    return randomId("p");
+}
+
+// ------------------------------------------------------------------
 // Colour helpers (phase-1 theme refactor)
 // ------------------------------------------------------------------
 
@@ -1094,6 +1139,9 @@ async function collectInitialData() {
         const errors = collectors.setupErrorTracking();
 
         const data = {
+            visitor_id: getVisitorId(),
+            session_id: getSessionId(),
+            pageview_id: createPageviewId(),
             timestamp: new Date().toISOString(),
             browser: collectors.getBrowserInfo(),
             performance: collectors.getPerformanceData(),

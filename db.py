@@ -117,6 +117,9 @@ class _Database:
         battery: dict | None = None,
         benchmarks: dict | None = None,
         client_timestamp: str | None = None,
+        visitor_id: str | None = None,
+        session_id: str | None = None,
+        pageview_id: str | None = None,
     ) -> None:
         """Persist a single record into *debug_data* table."""
 
@@ -126,8 +129,9 @@ class _Database:
         try:
             sql = (
                 "INSERT INTO debug_data (ip, browser_info, performance_data, "
-                "fingerprints, errors, network, battery, benchmarks, client_timestamp) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                "fingerprints, errors, network, battery, benchmarks, client_timestamp, "
+                "visitor_id, session_id, pageview_id) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
             )
 
             with self.get_conn() as conn:
@@ -144,6 +148,9 @@ class _Database:
                             Json(battery) if battery else None,
                             Json(benchmarks) if benchmarks else None,
                             client_timestamp,
+                            visitor_id,
+                            session_id,
+                            pageview_id,
                         ),
                     )
                     conn.commit()

@@ -1,8 +1,9 @@
 // Configuration
+const BASE_PATH = (window.COLLECTOR_BASE_PATH || "").replace(/\/$/, "");
 const CONFIG = {
     COLLECTION_DELAY: 3000,
-    ENDPOINT: "/collect",
-    EVENTS_ENDPOINT: "/event",
+    ENDPOINT: `${BASE_PATH}/collect`,
+    EVENTS_ENDPOINT: `${BASE_PATH}/event`,
     EVENTS_ENABLED: Boolean(window.COLLECTOR_EVENTS_ENABLED),
 };
 

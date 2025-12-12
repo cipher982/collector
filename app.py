@@ -270,7 +270,11 @@ def _compute_ip_hash(*, ip: str, salt: str | None) -> str | None:
 
 @app.route("/")
 def index():  # noqa: D401 – Flask view
-    return render_template("index.html", collector_events_enabled=_events_enabled())
+    return render_template(
+        "index.html",
+        collector_events_enabled=_events_enabled(),
+        application_root=APPLICATION_ROOT,
+    )
 
 
 @app.route("/event", methods=["POST"])

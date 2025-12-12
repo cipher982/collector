@@ -61,9 +61,18 @@ Running Locally without Docker
 6. Open http://localhost:5000 in your browser.
 
 APPLICATION ENDPOINTS
-- GET  /          — Serves the dashboard (index.html)  
-- POST /collect   — Receives JSON payload with browser, performance, fingerprint and error data; stores it and returns the same payload as JSON  
-- GET  /health    — Returns `{ status: "healthy", database: "connected" }` if DB connection succeeds, otherwise an error  
+- GET  /          — Serves the dashboard (index.html)
+- POST /collect   — Receives JSON payload with browser, performance, fingerprint and error data; stores it and returns the same payload as JSON
+- GET  /health    — Returns `{ status: "healthy", database: "connected" }` if DB connection succeeds, otherwise an error
+
+DATABASE MIGRATIONS
+The application uses a simple SQL migration system (no heavy dependencies like Alembic). Migrations are tracked and applied automatically on startup.
+
+To manually run migrations:
+    python migrate.py           # Apply pending migrations
+    python migrate.py --list    # Show migration status
+
+See `MIGRATIONS.md` for full documentation of the migration system.  
 
 FRONTEND WORKFLOW
 1. On page load (`window.onload`), initialize UI tabs and start data collection.  
@@ -75,13 +84,19 @@ FRONTEND WORKFLOW
 
 DATABASE SCHEMA
 Table: debug_data
-- id            SERIAL PRIMARY KEY  
-- ip            TEXT  
-- browser_info  TEXT (stringified JSON)  
-- performance_data TEXT (stringified JSON)  
-- fingerprints  TEXT (stringified JSON)  
-- errors        TEXT (stringified JSON)  
-- timestamp     TIMESTAMP DEFAULT CURRENT_TIMESTAMP  
+- id                SERIAL PRIMARY KEY
+- ip                TEXT
+- browser_info      JSONB
+- performance_data  JSONB
+- fingerprints      JSONB
+- errors            JSONB
+- network           JSONB
+- battery           JSONB
+- benchmarks        JSONB
+- client_timestamp  TIMESTAMPTZ
+- timestamp         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+The schema is managed by SQL migrations in the `migrations/` directory. See `MIGRATIONS.md` for details.  
 
 EXTENDING THE APP
 - Add new metrics in `static/script.js` under the `collectors` object and update UI rendering functions in the `ui` object.  

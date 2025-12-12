@@ -73,28 +73,34 @@ class _Database:
     # Schema helpers
     # ------------------------------------------------------------------
     def init_schema(self) -> None:
-        """Create tables if they do not yet exist."""
+        """Run database migrations to ensure schema is up to date.
 
-        ddl = """
-        CREATE TABLE IF NOT EXISTS debug_data (
-            id              SERIAL PRIMARY KEY,
-            ip              TEXT,
-            browser_info    JSONB,
-            performance_data JSONB,
-            fingerprints    JSONB,
-            errors          JSONB,
-            network         JSONB,
-            battery         JSONB,
-            benchmarks      JSONB,
-            client_timestamp TIMESTAMPTZ,
-            timestamp       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        The actual DDL is managed by SQL migration files in the migrations/
+        directory. This method delegates to the migration runner to apply any
+        pending migrations.
+
+        For reference, the final schema should be:
+            CREATE TABLE debug_data (
+                id              SERIAL PRIMARY KEY,
+                ip              TEXT,
+                browser_info    JSONB,
+                performance_data JSONB,
+                fingerprints    JSONB,
+                errors          JSONB,
+                network         JSONB,
+                battery         JSONB,
+                benchmarks      JSONB,
+                client_timestamp TIMESTAMPTZ,
+                timestamp       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """
+        from pathlib import Path
 
-        with self.get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(ddl)
-                conn.commit()
+        from migrations import MigrationRunner
+
+        migrations_dir = Path(__file__).parent / "migrations"
+        runner = MigrationRunner(os.getenv("DB_URL", ""), migrations_dir)
+        runner.run()
 
     # ------------------------------------------------------------------
     # Insert helpers

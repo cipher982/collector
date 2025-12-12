@@ -219,6 +219,25 @@ def _socket_emit(event: str, data) -> None:  # noqa: D401 – thin wrapper
 
 
 # ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+def get_client_ip() -> str:
+    """Extract real client IP, respecting proxy headers.
+
+    Checks common proxy headers in order of preference and falls back to
+    the direct connection address if no proxy headers are present.
+    """
+    # Check common proxy headers in order of preference
+    for header in ("CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"):
+        if ip := request.headers.get(header):
+            # X-Forwarded-For can be comma-separated; take first
+            return ip.split(",")[0].strip()
+    return request.remote_addr or ""
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -236,11 +255,15 @@ def collect() -> tuple[dict[str, Any], int]:  # noqa: D401 – Flask view
         data: Dict[str, Any] = request.get_json(force=True) or {}
 
         insert_debug_record(
-            ip=request.remote_addr or "",  # may be None in CLI tests
+            ip=get_client_ip(),
             browser_info=data.get("browser", {}),
             performance_data=data.get("performance", {}),
             fingerprints=data.get("fingerprints", {}),
             errors=data.get("errors", []),
+            network=data.get("network"),
+            battery=data.get("battery"),
+            benchmarks=data.get("benchmarks"),
+            client_timestamp=data.get("timestamp"),
         )
 
         # Push a lightweight update to real-time dashboards.

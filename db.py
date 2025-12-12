@@ -83,6 +83,10 @@ class _Database:
             performance_data JSONB,
             fingerprints    JSONB,
             errors          JSONB,
+            network         JSONB,
+            battery         JSONB,
+            benchmarks      JSONB,
+            client_timestamp TIMESTAMPTZ,
             timestamp       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
@@ -103,6 +107,10 @@ class _Database:
         performance_data: dict,
         fingerprints: dict,
         errors: list,
+        network: dict | None = None,
+        battery: dict | None = None,
+        benchmarks: dict | None = None,
+        client_timestamp: str | None = None,
     ) -> None:
         """Persist a single record into *debug_data* table."""
 
@@ -112,7 +120,8 @@ class _Database:
         try:
             sql = (
                 "INSERT INTO debug_data (ip, browser_info, performance_data, "
-                "fingerprints, errors) VALUES (%s, %s, %s, %s, %s)"
+                "fingerprints, errors, network, battery, benchmarks, client_timestamp) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
             )
 
             with self.get_conn() as conn:
@@ -125,6 +134,10 @@ class _Database:
                             Json(performance_data),
                             Json(fingerprints),
                             Json(errors),
+                            Json(network) if network else None,
+                            Json(battery) if battery else None,
+                            Json(benchmarks) if benchmarks else None,
+                            client_timestamp,
                         ),
                     )
                     conn.commit()

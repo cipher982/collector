@@ -32,6 +32,7 @@ line-length = 120
 markers = [
     "e2e: end-to-end browser tests",
 ]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff.lint]
 select = ["I", "E", "F", "Q000"]

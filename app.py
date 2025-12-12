@@ -257,7 +257,9 @@ def _compute_ip_hash(*, ip: str, salt: str | None) -> str | None:
     if not ip:
         return None
     h = hashlib.sha256()
-    h.update(f"{ip}{salt}".encode("utf-8"))
+    h.update(ip.encode("utf-8"))
+    h.update(b"\x00")
+    h.update(salt.encode("utf-8"))
     return h.hexdigest()
 
 

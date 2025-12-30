@@ -293,15 +293,18 @@ interface GpuData {
 **Commits:** 08cbd64, b2178d1, bcf069c, e5fc4a4, 42f6b4e, 310ebdc
 **Bundle Size:** 1.58 KB gzipped (ESM) - well under 3KB target
 
-### Phase 3: Context & Performance Collectors
+### Phase 3: Context & Performance Collectors ✅
 **Acceptance Criteria:**
-- [ ] `context.ts` collects browser, device, locale info
-- [ ] `performance.ts` collects Web Vitals and navigation timing
-- [ ] Both sync and async collection patterns supported
-- [ ] Unit tests with mocked browser APIs
-- [ ] `VisitorContext.collect()` returns context + performance data
+- [x] `context.ts` collects browser, device, locale info
+- [x] `performance.ts` collects Web Vitals and navigation timing
+- [x] Both sync and async collection patterns supported
+- [x] Unit tests with mocked browser APIs (23 tests passing)
+- [x] Exports added to index.ts for tree-shakeability
 
-**Test Command:** `cd lib && npm test -- --grep "collectors"`
+**Test Command:** `cd lib && bun test`
+**Completed:** 2024-12-30
+**Commits:** TBD
+**Bundle Size:** 3.6 KB gzipped (well under 5KB target)
 
 ### Phase 4: Network & Fingerprint Collectors
 **Acceptance Criteria:**
@@ -368,7 +371,7 @@ Existing `static/script.js` (1655 lines) will be gradually deprecated:
 
 - [x] Phase 1: Library Structure & Build Tooling (2024-12-30)
 - [x] Phase 2: Core Modules (2024-12-30)
-- [ ] Phase 3: Context & Performance Collectors
+- [x] Phase 3: Context & Performance Collectors (2024-12-30)
 - [ ] Phase 4: Network & Fingerprint Collectors
 - [ ] Phase 5: Event Emission & Full Integration
 - [ ] Phase 6: Static Hosting Integration

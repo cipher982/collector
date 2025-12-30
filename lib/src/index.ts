@@ -39,6 +39,22 @@ export {
   getPageviewId,
 } from './core/identity.js';
 
+// Collectors - Context
+export {
+  getBrowserInfo,
+  getDeviceInfo,
+  getLocaleInfo,
+  collectContext,
+} from './collectors/context.js';
+
+// Collectors - Performance
+export {
+  getNavigationTiming,
+  getResourceWaterfall,
+  getWebVitals,
+  collectPerformance,
+} from './collectors/performance.js';
+
 // Utilities
 export {
   storage,

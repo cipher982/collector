@@ -303,7 +303,7 @@ interface GpuData {
 
 **Test Command:** `cd lib && bun test`
 **Completed:** 2024-12-30
-**Commits:** TBD
+**Commit:** a6029f1
 **Bundle Size:** 3.6 KB gzipped (well under 5KB target)
 
 ### Phase 4: Network & Fingerprint Collectors

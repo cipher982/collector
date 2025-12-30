@@ -1,6 +1,6 @@
 # Visitor Context Library Spec
 
-**Status:** In Progress
+**Status:** Implemented
 **Created:** 2024-12-30
 **Protocol:** SDP-1
 

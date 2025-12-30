@@ -126,19 +126,17 @@ describe('network collectors', () => {
     });
 
     it('should measure latency successfully', async () => {
-      // Mock performance.now() to simulate 42ms elapsed
-      let callCount = 0;
+      // Mock performance.now() to return increasing timestamps
+      const timestamps = [100, 142]; // start at 100, end at 142 = 42ms elapsed
+      let callIndex = 0;
       vi.spyOn(global.performance, 'now').mockImplementation(() => {
-        callCount++;
-        return callCount === 1 ? 0 : 42; // First call: 0, second call: 42
+        const value = timestamps[callIndex] ?? timestamps[timestamps.length - 1];
+        callIndex++;
+        return value;
       });
 
-      // Mock fetch to succeed
-      global.fetch = vi.fn().mockImplementation(() => {
-        return Promise.resolve({
-          ok: true,
-        });
-      });
+      // Mock fetch to succeed immediately
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
 
       const latency = await measureLatency('/ping');
 
@@ -166,20 +164,22 @@ describe('network collectors', () => {
     });
 
     it('should timeout if request takes too long', async () => {
-      // Mock fetch that never resolves in time
+      // Mock fetch that delays longer than timeout
       global.fetch = vi.fn().mockImplementation((_url, options) => {
         return new Promise((resolve, reject) => {
-          // Simulate abort controller timeout
           const signal = options?.signal as AbortSignal;
           if (signal) {
             signal.addEventListener('abort', () => {
-              reject(new Error('AbortError'));
+              reject(new DOMException('Aborted', 'AbortError'));
             });
           }
+          // Resolve after a long delay (will be aborted first)
+          setTimeout(() => resolve({ ok: true }), 500);
         });
       });
 
-      const latency = await measureLatency('/ping', 100);
+      // Use a very short timeout (50ms) - fetch will be aborted
+      const latency = await measureLatency('/ping', 50);
 
       expect(latency).toBeNull();
     });
@@ -267,20 +267,22 @@ describe('network collectors', () => {
     });
 
     it('should timeout if download takes too long', async () => {
-      // Mock fetch that never resolves in time
+      // Mock fetch that delays longer than timeout
       global.fetch = vi.fn().mockImplementation((_url, options) => {
         return new Promise((resolve, reject) => {
-          // Simulate abort controller timeout
           const signal = options?.signal as AbortSignal;
           if (signal) {
             signal.addEventListener('abort', () => {
-              reject(new Error('AbortError'));
+              reject(new DOMException('Aborted', 'AbortError'));
             });
           }
+          // Resolve after a long delay (will be aborted first)
+          setTimeout(() => resolve({ ok: true, headers: { get: () => '1000' } }), 500);
         });
       });
 
-      const bandwidth = await measureBandwidth('/speedtest', 100);
+      // Use a very short timeout (50ms) - fetch will be aborted
+      const bandwidth = await measureBandwidth('/speedtest', 50);
 
       expect(bandwidth).toBeNull();
     });
@@ -423,23 +425,24 @@ describe('network collectors', () => {
     });
 
     it('should pass custom timeout to measurements', async () => {
-      // Mock fetch that never resolves in time
+      // Mock fetch that delays longer than timeout
       global.fetch = vi.fn().mockImplementation((_url, options) => {
         return new Promise((resolve, reject) => {
-          // Simulate abort controller timeout
           const signal = options?.signal as AbortSignal;
           if (signal) {
             signal.addEventListener('abort', () => {
-              reject(new Error('AbortError'));
+              reject(new DOMException('Aborted', 'AbortError'));
             });
           }
+          // Resolve after a long delay (will be aborted first)
+          setTimeout(() => resolve({ ok: true }), 500);
         });
       });
 
-      // Verify timeout was respected (measurement should fail)
+      // Use a very short timeout (50ms) - should abort
       const network = await collectNetworkInfo({
         latencyEndpoint: '/ping',
-        timeout: 100,
+        timeout: 50,
       });
 
       expect(network.latencyMs).toBeNull();

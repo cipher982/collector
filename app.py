@@ -462,6 +462,52 @@ def bandwidth():  # noqa: D401 – simple bandwidth test payload
     return ("x" * size, 200, {"Content-Type": "text/plain"})
 
 
+@app.route("/v1/context.min.js")
+def context_library():  # noqa: D401 – serve visitor context library
+    """Serve the visitor context library with proper caching and CORS headers.
+
+    Attempts to serve from static/v1/context.min.js (production) first, then
+    falls back to lib/dist/index.min.js (development). Returns 404 if neither
+    exists.
+
+    Headers:
+    - Content-Type: application/javascript
+    - Cache-Control: public, max-age=31536000, immutable (1 year)
+    - ETag: SHA256 hash of file contents
+    - Access-Control-Allow-Origin: * (CORS for cross-origin script tags)
+    """
+    import pathlib
+
+    # Try production path first, then development path
+    root = pathlib.Path(__file__).parent
+    production_path = root / "static" / "v1" / "context.min.js"
+    dev_path = root / "lib" / "dist" / "index.min.js"
+
+    lib_path = production_path if production_path.exists() else dev_path
+
+    if not lib_path.exists():
+        return jsonify({"message": "Library not found"}), 404
+
+    # Read file and compute ETag
+    content = lib_path.read_bytes()
+    etag = hashlib.sha256(content).hexdigest()
+
+    # Check If-None-Match header for 304 response
+    if request.headers.get("If-None-Match") == etag:
+        return ("", 304)
+
+    return (
+        content,
+        200,
+        {
+            "Content-Type": "application/javascript",
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "ETag": etag,
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # Entry-point helper
 # ---------------------------------------------------------------------------

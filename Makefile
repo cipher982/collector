@@ -24,7 +24,7 @@ APP     ?= app.py
 # The uv CLI binary – adjust if it lives elsewhere
 UV      ?= uv
 
-.PHONY: help run test lint format shell sync lock update docker-build docker-up docker-down docker-logs clean
+.PHONY: help run test lint format shell sync lock update build-lib docker-build docker-up docker-down docker-logs clean
 
 # -----------------------------------------------------------------------------
 # Help (default)
@@ -66,6 +66,13 @@ lock: ## Re-solve deps & regenerate uv.lock (write-time ~)
 
 update: ## Update deps to latest (writes new lockfile)
 	$(UV) pip sync --upgrade
+
+# -----------------------------------------------------------------------------
+# Library building
+# -----------------------------------------------------------------------------
+
+build-lib: ## Build visitor context library and copy to static/v1/
+	./scripts/build-library.sh
 
 # -----------------------------------------------------------------------------
 # Docker wrappers – unchanged

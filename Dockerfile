@@ -1,8 +1,20 @@
+FROM oven/bun:1 AS library-builder
+
+WORKDIR /build
+COPY lib/package.json lib/tsconfig.json lib/tsup.config.ts ./
+COPY lib/src ./src
+RUN bun install --frozen-lockfile
+RUN bun run build
+
 FROM python:3.12-slim
 
 WORKDIR /app
 COPY . .
 RUN pip install uv
+
+# Copy built library from builder stage
+COPY --from=library-builder /build/dist/index.min.js static/v1/context.min.js
+COPY --from=library-builder /build/dist/index.min.js.map static/v1/context.min.js.map
 
 # Install dependencies
 RUN uv sync

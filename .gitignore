@@ -166,3 +166,6 @@ data/
 lib/node_modules/
 lib/dist/
 lib/bun.lock
+
+# Built library copies (generated from lib/dist/)
+static/v1/

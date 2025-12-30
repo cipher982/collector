@@ -202,7 +202,7 @@ export async function collectNetworkInfo(options?: {
 
   return {
     ...baseInfo,
-    latencyMs: latencyMs ?? undefined,
-    bandwidthMbps: bandwidthMbps ?? undefined,
+    latencyMs,
+    bandwidthMbps,
   };
 }

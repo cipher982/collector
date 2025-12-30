@@ -114,9 +114,9 @@ export interface NetworkData {
   /** Round-trip time (ms) */
   rtt: number | null;
   saveData: boolean;
-  /** Active measurements (if endpoints provided) */
-  latencyMs?: number;
-  bandwidthMbps?: number;
+  /** Active measurements (if endpoints provided). Null if measurement failed. */
+  latencyMs?: number | null;
+  bandwidthMbps?: number | null;
 }
 
 /**

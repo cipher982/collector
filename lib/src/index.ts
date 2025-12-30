@@ -55,6 +55,23 @@ export {
   collectPerformance,
 } from './collectors/performance.js';
 
+// Collectors - Network
+export {
+  getNetworkInfo,
+  measureLatency,
+  measureBandwidth,
+  collectNetworkInfo,
+} from './collectors/network.js';
+
+// Collectors - Fingerprint
+export {
+  getCanvasFingerprint,
+  getCanvasFingerprintHash,
+  detectFonts,
+  getWebGLInfo,
+  collectFingerprint,
+} from './collectors/fingerprint.js';
+
 // Utilities
 export {
   storage,

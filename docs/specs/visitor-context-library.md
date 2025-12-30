@@ -266,16 +266,18 @@ interface GpuData {
 
 ## Implementation Phases
 
-### Phase 1: Library Structure & Build Tooling
+### Phase 1: Library Structure & Build Tooling ✅
 **Acceptance Criteria:**
-- [ ] `lib/` directory created with proper structure
-- [ ] `package.json` with correct dependencies (tsup, typescript, vitest)
-- [ ] `tsconfig.json` configured for ES2020 target
-- [ ] `tsup.config.ts` producing ESM, CJS, UMD outputs
-- [ ] Build command works: `npm run build` produces `dist/`
-- [ ] Stub `index.ts` exports empty object
+- [x] `lib/` directory created with proper structure
+- [x] `package.json` with correct dependencies (tsup, typescript, vitest)
+- [x] `tsconfig.json` configured for ES2020 target
+- [x] `tsup.config.ts` producing ESM, CJS, IIFE (UMD) outputs
+- [x] Build command works: `bun run build` produces `dist/`
+- [x] Stub `index.ts` exports empty object
 
-**Test Command:** `cd lib && npm run build && ls dist/`
+**Test Command:** `cd lib && bun run build && ls dist/`
+**Completed:** 2024-12-30
+**Commit:** 1ba707e
 
 ### Phase 2: Core Modules (Identity, Config, Types)
 **Acceptance Criteria:**
@@ -361,7 +363,7 @@ Existing `static/script.js` (1655 lines) will be gradually deprecated:
 
 ## Implementation Status
 
-- [ ] Phase 1: Library Structure & Build Tooling
+- [x] Phase 1: Library Structure & Build Tooling (2024-12-30)
 - [ ] Phase 2: Core Modules
 - [ ] Phase 3: Context & Performance Collectors
 - [ ] Phase 4: Network & Fingerprint Collectors

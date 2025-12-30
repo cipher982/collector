@@ -123,10 +123,12 @@ function scheduleBatchFlush(): void {
     return; // Already scheduled
   }
 
-  batchTimer = window.setTimeout(() => {
-    batchTimer = null;
-    flushEvents();
-  }, config.batchInterval);
+  if (typeof window !== 'undefined' && window.setTimeout) {
+    batchTimer = window.setTimeout(() => {
+      batchTimer = null;
+      flushEvents();
+    }, config.batchInterval);
+  }
 }
 
 /**
@@ -172,14 +174,14 @@ export function emitEvent(
 
   // Build event envelope
   const envelope: EventEnvelope = {
-    visitor_id: getVisitorId(),
-    session_id: getSessionId(),
+    visitor_id: getVisitorId(config.identity),
+    session_id: getSessionId(config.identity),
     pageview_id: getPageviewId(),
     event_type,
     seq: eventSequence,
     client_timestamp: options.client_timestamp || new Date().toISOString(),
-    path: options.path ?? window.location.pathname,
-    referrer: options.referrer ?? (document.referrer || null),
+    path: options.path ?? (typeof window !== 'undefined' ? window.location.pathname : '/'),
+    referrer: options.referrer ?? (typeof document !== 'undefined' ? (document.referrer || null) : null),
     payload: options.payload ?? {},
   };
 

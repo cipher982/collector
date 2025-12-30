@@ -121,7 +121,7 @@ export async function collect(): Promise<VisitorContext> {
   const config = getConfig();
 
   // Always collect identity and context (required)
-  const identity = collectIdentity();
+  const identity = collectIdentity(config.identity);
   const contextData = collectContext();
 
   // Build base context

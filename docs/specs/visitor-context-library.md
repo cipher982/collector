@@ -50,6 +50,16 @@ Create a standalone, tree-shakeable JavaScript library for collecting browser/de
 - Would need Playwright setup (not yet configured)
 **Revisit if:** Bugs discovered in real browsers that unit tests didn't catch
 
+### Decision: Multi-stage Docker build for library
+**Context:** Need to build TypeScript library in Python-based Docker image
+**Choice:** Multi-stage build with Bun builder + Python runtime
+**Rationale:**
+- Keeps final image small (no Node.js/Bun in production)
+- Library built at image build time (deterministic)
+- Developer workflow: `make build-lib` for local testing
+- Production: Library baked into `static/v1/` in image
+**Revisit if:** Build times become problematic (currently <30s total)
+
 ## Architecture
 
 ```
@@ -343,15 +353,18 @@ interface GpuData {
 **Test Results:** 160 tests passing (19 emitter + 9 integration)
 **Bundle Size:** 6.0 KB gzipped (well under 12 KB target)
 
-### Phase 6: Static Hosting Integration
+### Phase 6: Static Hosting Integration ✅
 **Acceptance Criteria:**
-- [ ] Flask route `/v1/context.min.js` serves built library
-- [ ] Proper caching headers (Cache-Control, ETag)
-- [ ] CORS headers for cross-origin usage
-- [ ] Version bump workflow documented
-- [ ] Integration test: fetch from Flask, verify works
+- [x] Flask route `/v1/context.min.js` serves built library
+- [x] Proper caching headers (Cache-Control, ETag)
+- [x] CORS headers for cross-origin usage
+- [x] Version bump workflow documented
+- [x] Integration test: fetch from Flask, verify works
 
 **Test Command:** `curl -I http://localhost:5000/v1/context.min.js`
+**Completed:** 2024-12-30
+**Commits:** f8041ec, 1ea5581
+**Test Results:** 12 tests passing (6 new library tests)
 
 ## File Size Budget
 
@@ -391,4 +404,97 @@ Existing `static/script.js` (1655 lines) will be gradually deprecated:
 - [x] Phase 3: Context & Performance Collectors (2024-12-30)
 - [x] Phase 4: Network & Fingerprint Collectors (2024-12-30)
 - [x] Phase 5: Event Emission & Full Integration (2024-12-30)
-- [ ] Phase 6: Static Hosting Integration
+- [x] Phase 6: Static Hosting Integration (2024-12-30)
+
+## Version Bump & Deployment Workflow
+
+### Local Development
+
+1. **Make changes** to library source code in `lib/src/`
+2. **Run tests**: `cd lib && bun test`
+3. **Build library**: `make build-lib` (or `./scripts/build-library.sh`)
+4. **Test Flask route**: `make run` and visit `http://localhost:5000/v1/context.min.js`
+5. **Commit changes** with SDP-1 message format
+
+### Version Bump Process
+
+When releasing a new version:
+
+```bash
+# 1. Update version in lib/package.json
+cd lib
+# Edit package.json: "version": "0.2.0"
+
+# 2. Build and test
+bun run build
+bun test
+
+# 3. Copy to static/ for production
+cd ..
+make build-lib
+
+# 4. Run integration tests
+uv run pytest tests/test_context_library.py -xvs
+
+# 5. Commit
+git add lib/package.json
+git commit -m "bump library version to 0.2.0"
+```
+
+### Docker Deployment
+
+The Dockerfile uses a multi-stage build:
+
+1. **Stage 1 (library-builder)**: Uses `oven/bun:1` image to build library
+2. **Stage 2 (app)**: Copies built library to `static/v1/context.min.js`
+
+```bash
+# Build Docker image (includes library build)
+docker build -t collector:latest .
+
+# Or with docker-compose
+docker compose up -d --build
+```
+
+The Flask route `/v1/context.min.js`:
+- **Production**: Serves from `static/v1/context.min.js` (baked into image)
+- **Development**: Falls back to `lib/dist/index.min.js` (live builds)
+
+### Integration Examples
+
+**CDN-style script tag:**
+```html
+<script src="https://collector.drose.io/v1/context.min.js"></script>
+<script>
+  VisitorContext.collect().then(ctx => {
+    console.log('Visitor ID:', ctx.identity.visitorId);
+    console.log('Browser:', ctx.browser.userAgent);
+  });
+</script>
+```
+
+**With versioning (future):**
+```html
+<!-- Pin to specific version when needed -->
+<script src="https://collector.drose.io/v1/0.2.0/context.min.js"></script>
+```
+
+**With subresource integrity (future):**
+```html
+<script
+  src="https://collector.drose.io/v1/context.min.js"
+  integrity="sha256-..."
+  crossorigin="anonymous"
+></script>
+```
+
+### Cache Behavior
+
+The library is served with aggressive caching:
+- `Cache-Control: public, max-age=31536000, immutable` (1 year)
+- `ETag` header for conditional requests (304 responses)
+- `Access-Control-Allow-Origin: *` for cross-origin usage
+
+**Cache Busting Strategy:**
+- Use query parameters: `/v1/context.min.js?v=0.2.0`
+- Or version in path: `/v1/0.2.0/context.min.js` (future enhancement)

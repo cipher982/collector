@@ -10,7 +10,8 @@ export { configure, getConfig, resetConfig, defaultConfig } from './config.js';
 
 // Types
 export type {
-  VisitorContext,
+  // Note: VisitorContext type exported as VisitorContextData to avoid conflict with VisitorContext namespace
+  VisitorContext as VisitorContextData,
   IdentityData,
   BrowserInfo,
   DeviceInfo,
@@ -91,7 +92,7 @@ export {
 } from './utils/storage.js';
 
 // Main collection API
-import type { VisitorContext } from './types.js';
+import type { VisitorContext as VisitorContextType } from './types.js';
 import { getConfig } from './config.js';
 import { collectIdentity } from './core/identity.js';
 import { collectContext } from './collectors/context.js';
@@ -110,14 +111,19 @@ import { collectFingerprint } from './collectors/fingerprint.js';
  *
  * @example
  * ```typescript
- * import { VisitorContext } from '@collector/context';
+ * import { collect, VisitorContext } from '@collector/context';
  *
+ * // Option 1: Direct function call
+ * const ctx = await collect();
+ *
+ * // Option 2: Namespace style
  * const ctx = await VisitorContext.collect();
+ *
  * console.log(ctx.browser.userAgent);
  * console.log(ctx.identity.visitorId);
  * ```
  */
-export async function collect(): Promise<VisitorContext> {
+export async function collect(): Promise<VisitorContextType> {
   const config = getConfig();
 
   // Always collect identity and context (required)
@@ -125,7 +131,7 @@ export async function collect(): Promise<VisitorContext> {
   const contextData = collectContext();
 
   // Build base context
-  const result: VisitorContext = {
+  const result: VisitorContextType = {
     identity,
     browser: contextData.browser,
     device: contextData.device,
@@ -161,6 +167,7 @@ export async function collect(): Promise<VisitorContext> {
  * Main VisitorContext namespace
  *
  * Provides the primary API for collecting visitor context data.
+ * This is an alias for backward compatibility.
  */
 export const VisitorContext = {
   collect,

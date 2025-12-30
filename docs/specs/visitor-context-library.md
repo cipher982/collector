@@ -279,16 +279,19 @@ interface GpuData {
 **Completed:** 2024-12-30
 **Commit:** 1ba707e
 
-### Phase 2: Core Modules (Identity, Config, Types)
+### Phase 2: Core Modules (Identity, Config, Types) ✅
 **Acceptance Criteria:**
-- [ ] `types.ts` defines all interfaces
-- [ ] `config.ts` implements configuration system with defaults
-- [ ] `identity.ts` generates/persists visitor_id, session_id, pageview_id
-- [ ] `storage.ts` wraps localStorage/sessionStorage with fallbacks
-- [ ] Unit tests pass for all core modules
-- [ ] `configure()` function exported and working
+- [x] `types.ts` defines all interfaces
+- [x] `config.ts` implements configuration system with defaults
+- [x] `identity.ts` generates/persists visitor_id, session_id, pageview_id
+- [x] `storage.ts` wraps localStorage/sessionStorage with fallbacks
+- [x] Unit tests pass for all core modules (54 tests)
+- [x] `configure()` function exported and working
 
-**Test Command:** `cd lib && npm test -- --grep "core"`
+**Test Command:** `cd lib && bun test`
+**Completed:** 2024-12-30
+**Commits:** 08cbd64, b2178d1, bcf069c, e5fc4a4, 42f6b4e, 310ebdc
+**Bundle Size:** 1.58 KB gzipped (ESM) - well under 3KB target
 
 ### Phase 3: Context & Performance Collectors
 **Acceptance Criteria:**
@@ -364,7 +367,7 @@ Existing `static/script.js` (1655 lines) will be gradually deprecated:
 ## Implementation Status
 
 - [x] Phase 1: Library Structure & Build Tooling (2024-12-30)
-- [ ] Phase 2: Core Modules
+- [x] Phase 2: Core Modules (2024-12-30)
 - [ ] Phase 3: Context & Performance Collectors
 - [ ] Phase 4: Network & Fingerprint Collectors
 - [ ] Phase 5: Event Emission & Full Integration

@@ -134,12 +134,12 @@ export function detectFonts(
       return [];
     }
 
+    // Measure baseline width once (monospace)
+    ctx.font = `${testSize} ${baseFonts[0]}`;
+    const baseWidth = ctx.measureText(testString).width;
+
     // Helper: detect if a font is available
     const detectFont = (font: string): boolean => {
-      // Measure baseline (monospace)
-      ctx.font = `${testSize} ${baseFonts[0]}`;
-      const baseWidth = ctx.measureText(testString).width;
-
       // Measure with test font
       ctx.font = `${testSize} ${font},${baseFonts[0]}`;
       const testWidth = ctx.measureText(testString).width;

@@ -75,6 +75,28 @@ export interface WebVitals {
 }
 
 /**
+ * Collection profiling metadata
+ */
+export type ProfileStatus = 'ok' | 'error' | 'skipped';
+
+export interface ProfileStep {
+  name: string;
+  status: ProfileStatus;
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+  errorMessage?: string;
+  meta?: Record<string, any>;
+}
+
+export interface CollectionProfile {
+  startedAtMs: number;
+  endedAtMs: number;
+  durationMs: number;
+  steps: ProfileStep[];
+}
+
+/**
  * Navigation timing metrics
  */
 export interface TimingData {
@@ -215,6 +237,15 @@ export interface FingerprintConfig {
  */
 export interface PerformanceConfig {
   webVitals: boolean;
+  /**
+   * How long to wait for web vitals observers to settle (ms).
+   *
+   * Notes:
+   * - Web-vitals can take seconds (or require user input) to fully stabilize.
+   * - For "fast first response" use cases, set this to a low number (e.g. 150–300ms)
+   *   or disable `webVitals` entirely.
+   */
+  webVitalsTimeoutMs?: number;
   navigationTiming: boolean;
   /** Can be large */
   resourceWaterfall: boolean;

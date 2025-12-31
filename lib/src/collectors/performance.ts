@@ -76,7 +76,10 @@ export function getResourceWaterfall(): ResourceEntry[] {
  * Note: Some metrics (like LCP, CLS) may update over time. This function
  * captures the final values after a timeout or page visibility change.
  */
-export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
+export function getWebVitals(
+  timeoutMs: number = 5000,
+  onMetric?: (metric: keyof WebVitals, value: number, observedAfterMs: number) => void
+): Promise<WebVitals> {
   const vitals: WebVitals = {
     lcp: null,
     fcp: null,
@@ -93,6 +96,21 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
   return new Promise((resolve) => {
     const observers: PerformanceObserver[] = [];
     let resolved = false;
+    const startedAt = performance.now();
+    const observedAfterMs: Partial<Record<keyof WebVitals, number>> = {};
+
+    const noteMetric = (metric: keyof WebVitals, value: number) => {
+      if (observedAfterMs[metric] !== undefined) return;
+      const t = performance.now() - startedAt;
+      observedAfterMs[metric] = t;
+      if (onMetric) {
+        try {
+          onMetric(metric, value, t);
+        } catch {
+          // ignore user callback failures
+        }
+      }
+    };
 
     // Helper to resolve once
     const resolveOnce = () => {
@@ -118,7 +136,9 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
         const navEntry = entries.find((e) => e.entryType === 'navigation');
         if (navEntry) {
           const nav = navEntry as PerformanceNavigationTiming;
-          vitals.ttfb = Math.round(nav.responseStart - nav.requestStart);
+          const v = Math.round(nav.responseStart - nav.requestStart);
+          vitals.ttfb = v;
+          noteMetric('ttfb', v);
         }
       });
       ttfbObserver.observe({ type: 'navigation', buffered: true });
@@ -129,7 +149,9 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
         const entries = list.getEntries();
         const fcpEntry = entries.find((e) => e.name === 'first-contentful-paint');
         if (fcpEntry) {
-          vitals.fcp = Math.round(fcpEntry.startTime);
+          const v = Math.round(fcpEntry.startTime);
+          vitals.fcp = v;
+          noteMetric('fcp', v);
         }
       });
       fcpObserver.observe({ type: 'paint', buffered: true });
@@ -141,7 +163,9 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
         if (entries.length > 0) {
           const lastEntry = entries[entries.length - 1];
           if (lastEntry) {
-            vitals.lcp = Math.round(lastEntry.startTime);
+            const v = Math.round(lastEntry.startTime);
+            vitals.lcp = v;
+            noteMetric('lcp', v);
           }
         }
       });
@@ -153,7 +177,9 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
         const entries = list.getEntries();
         if (entries.length > 0 && vitals.fid === null) {
           const firstEntry = entries[0] as PerformanceEventTiming;
-          vitals.fid = Math.round(firstEntry.processingStart - firstEntry.startTime);
+          const v = Math.round(firstEntry.processingStart - firstEntry.startTime);
+          vitals.fid = v;
+          noteMetric('fid', v);
           fidObserver.disconnect();
         }
       });
@@ -169,7 +195,9 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
             clsScore += layoutShift.value;
           }
         }
-        vitals.cls = Number(clsScore.toFixed(3));
+        const v = Number(clsScore.toFixed(3));
+        vitals.cls = v;
+        noteMetric('cls', v);
       });
       clsObserver.observe({ type: 'layout-shift', buffered: true });
       observers.push(clsObserver);
@@ -199,17 +227,32 @@ export function getWebVitals(timeoutMs: number = 5000): Promise<WebVitals> {
  * @returns Promise that resolves with complete performance data
  */
 export async function collectPerformance(options: {
+  includeWebVitals?: boolean;
+  includeNavigationTiming?: boolean;
   includeResources?: boolean;
   webVitalsTimeout?: number;
 } = {}): Promise<PerformanceData> {
-  const { includeResources = false, webVitalsTimeout = 5000 } = options;
+  const {
+    includeWebVitals = true,
+    includeNavigationTiming = true,
+    includeResources = false,
+    webVitalsTimeout = 5000,
+  } = options;
 
-  const [webVitals] = await Promise.all([getWebVitals(webVitalsTimeout)]);
-
-  const data: PerformanceData = {
-    webVitals,
-    timing: getNavigationTiming(),
+  const emptyWebVitals: WebVitals = {
+    lcp: null,
+    fcp: null,
+    fid: null,
+    cls: null,
+    ttfb: null,
   };
+
+  const webVitals = includeWebVitals ? await getWebVitals(webVitalsTimeout) : emptyWebVitals;
+  const timing: TimingData = includeNavigationTiming
+    ? getNavigationTiming()
+    : { dnsLookup: 0, tcpConnect: 0, ttfb: 0, domReady: 0, loadComplete: 0 };
+
+  const data: PerformanceData = { webVitals, timing };
 
   if (includeResources) {
     data.resources = getResourceWaterfall();

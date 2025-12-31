@@ -38,7 +38,10 @@ export const defaultConfig: LibraryConfig = {
 
   // Performance options
   performance: {
-    webVitals: true,
+    // Web-vitals collection is expensive (seconds) and often not needed for first paint UX.
+    // Keep it opt-in and enable explicitly where accuracy matters.
+    webVitals: false,
+    webVitalsTimeoutMs: 5000,
     navigationTiming: true,
     resourceWaterfall: false, // Can be large
   },

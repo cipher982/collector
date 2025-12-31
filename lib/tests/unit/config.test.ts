@@ -45,7 +45,8 @@ describe('config', () => {
     });
 
     it('should have performance options configured', () => {
-      expect(defaultConfig.performance.webVitals).toBe(true);
+      expect(defaultConfig.performance.webVitals).toBe(false);
+      expect(defaultConfig.performance.webVitalsTimeoutMs).toBe(5000);
       expect(defaultConfig.performance.navigationTiming).toBe(true);
       expect(defaultConfig.performance.resourceWaterfall).toBe(false);
     });
@@ -160,7 +161,7 @@ describe('config', () => {
       });
 
       expect(config.performance.resourceWaterfall).toBe(true);
-      expect(config.performance.webVitals).toBe(true); // Default preserved
+      expect(config.performance.webVitals).toBe(false); // Default preserved
     });
 
     it('should return the updated config', () => {

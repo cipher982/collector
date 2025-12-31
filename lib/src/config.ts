@@ -38,10 +38,11 @@ export const defaultConfig: LibraryConfig = {
 
   // Performance options
   performance: {
-    // Web-vitals collection is expensive (seconds) and often not needed for first paint UX.
-    // Keep it opt-in and enable explicitly where accuracy matters.
-    webVitals: false,
-    webVitalsTimeoutMs: 5000,
+    // Web-vitals collection can be slow if waiting for FID (user input) or CLS (layout shifts).
+    // By default, only collect instant metrics (ttfb, fcp, lcp) which are buffered.
+    webVitals: true,
+    webVitalsTimeoutMs: 500, // Short timeout since instant metrics resolve in <10ms
+    webVitalsMetrics: ['ttfb', 'fcp', 'lcp'], // Skip fid (needs interaction), cls (keeps updating)
     navigationTiming: true,
     resourceWaterfall: false, // Can be large
   },

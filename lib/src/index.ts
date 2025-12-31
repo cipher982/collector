@@ -155,7 +155,8 @@ export async function collect(): Promise<VisitorContextType> {
         includeWebVitals: config.performance.webVitals,
         includeNavigationTiming: config.performance.navigationTiming,
         includeResources: config.performance.resourceWaterfall,
-        webVitalsTimeout: config.performance.webVitalsTimeoutMs ?? 5000,
+        webVitalsTimeout: config.performance.webVitalsTimeoutMs ?? 500,
+        webVitalsMetrics: config.performance.webVitalsMetrics ?? ['ttfb', 'fcp', 'lcp'],
       })
     : Promise.resolve(undefined);
 
@@ -227,17 +228,23 @@ export async function collectProfiled(options: {
   const webVitalsTimeoutMs = options.webVitalsTimeoutMs ?? config.performance.webVitalsTimeoutMs ?? 5000;
 
   // Performance (broken out so you can see what blocks)
+  const webVitalsMetrics = config.performance.webVitalsMetrics ?? ['ttfb', 'fcp', 'lcp'];
   if (config.modules.performance) {
     if (includeWebVitals) {
       const metricObservedAfterMs: Partial<Record<keyof WebVitals, number>> = {};
       const webVitals = await profiler.step(
         'performance.webVitals',
         () =>
-          getWebVitals(webVitalsTimeoutMs, (metric, _value, observedAfterMs) => {
-            metricObservedAfterMs[metric] = observedAfterMs;
-          }),
+          getWebVitals(
+            webVitalsTimeoutMs,
+            webVitalsMetrics,
+            (metric: keyof WebVitals, _value: number, observedAfterMs: number) => {
+              metricObservedAfterMs[metric] = observedAfterMs;
+            }
+          ),
         () => ({
           timeoutMs: webVitalsTimeoutMs,
+          metrics: webVitalsMetrics,
           metricObservedAfterMs: { ...metricObservedAfterMs },
         })
       );

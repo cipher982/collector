@@ -70,14 +70,13 @@ export function getResourceWaterfall(): ResourceEntry[] {
 /**
  * Get Web Vitals metrics (async, uses PerformanceObserver)
  *
- * This function returns a promise that resolves with initial metrics
- * and sets up observers to capture metrics as they become available.
- *
- * Note: Some metrics (like LCP, CLS) may update over time. This function
- * captures the final values after a timeout or page visibility change.
+ * @param timeoutMs - Max time to wait for metrics
+ * @param metrics - Which metrics to collect. Default: all. Recommended: ['ttfb', 'fcp', 'lcp']
+ * @param onMetric - Callback when a metric is observed
  */
 export function getWebVitals(
   timeoutMs: number = 5000,
+  metrics: Array<keyof WebVitals> = ['ttfb', 'fcp', 'lcp', 'fid', 'cls'],
   onMetric?: (metric: keyof WebVitals, value: number, observedAfterMs: number) => void
 ): Promise<WebVitals> {
   const vitals: WebVitals = {
@@ -93,22 +92,34 @@ export function getWebVitals(
     return Promise.resolve(vitals);
   }
 
+  // No metrics requested
+  if (metrics.length === 0) {
+    return Promise.resolve(vitals);
+  }
+
+  const metricsSet = new Set(metrics);
+
   return new Promise((resolve) => {
     const observers: PerformanceObserver[] = [];
     let resolved = false;
     const startedAt = performance.now();
-    const observedAfterMs: Partial<Record<keyof WebVitals, number>> = {};
+    const collected = new Set<keyof WebVitals>();
 
     const noteMetric = (metric: keyof WebVitals, value: number) => {
-      if (observedAfterMs[metric] !== undefined) return;
+      if (collected.has(metric)) return;
+      collected.add(metric);
       const t = performance.now() - startedAt;
-      observedAfterMs[metric] = t;
       if (onMetric) {
         try {
           onMetric(metric, value, t);
         } catch {
           // ignore user callback failures
         }
+      }
+      // Resolve early if all requested metrics collected
+      if (collected.size >= metricsSet.size) {
+        clearTimeout(timeoutId);
+        resolveOnce();
       }
     };
 
@@ -131,76 +142,86 @@ export function getWebVitals(
 
     try {
       // TTFB - Time to First Byte
-      const ttfbObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        const navEntry = entries.find((e) => e.entryType === 'navigation');
-        if (navEntry) {
-          const nav = navEntry as PerformanceNavigationTiming;
-          const v = Math.round(nav.responseStart - nav.requestStart);
-          vitals.ttfb = v;
-          noteMetric('ttfb', v);
-        }
-      });
-      ttfbObserver.observe({ type: 'navigation', buffered: true });
-      observers.push(ttfbObserver);
+      if (metricsSet.has('ttfb')) {
+        const ttfbObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const navEntry = entries.find((e) => e.entryType === 'navigation');
+          if (navEntry) {
+            const nav = navEntry as PerformanceNavigationTiming;
+            const v = Math.round(nav.responseStart - nav.requestStart);
+            vitals.ttfb = v;
+            noteMetric('ttfb', v);
+          }
+        });
+        ttfbObserver.observe({ type: 'navigation', buffered: true });
+        observers.push(ttfbObserver);
+      }
 
       // FCP - First Contentful Paint
-      const fcpObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        const fcpEntry = entries.find((e) => e.name === 'first-contentful-paint');
-        if (fcpEntry) {
-          const v = Math.round(fcpEntry.startTime);
-          vitals.fcp = v;
-          noteMetric('fcp', v);
-        }
-      });
-      fcpObserver.observe({ type: 'paint', buffered: true });
-      observers.push(fcpObserver);
+      if (metricsSet.has('fcp')) {
+        const fcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const fcpEntry = entries.find((e) => e.name === 'first-contentful-paint');
+          if (fcpEntry) {
+            const v = Math.round(fcpEntry.startTime);
+            vitals.fcp = v;
+            noteMetric('fcp', v);
+          }
+        });
+        fcpObserver.observe({ type: 'paint', buffered: true });
+        observers.push(fcpObserver);
+      }
 
       // LCP - Largest Contentful Paint
-      const lcpObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        if (entries.length > 0) {
-          const lastEntry = entries[entries.length - 1];
-          if (lastEntry) {
-            const v = Math.round(lastEntry.startTime);
-            vitals.lcp = v;
-            noteMetric('lcp', v);
+      if (metricsSet.has('lcp')) {
+        const lcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          if (entries.length > 0) {
+            const lastEntry = entries[entries.length - 1];
+            if (lastEntry) {
+              const v = Math.round(lastEntry.startTime);
+              vitals.lcp = v;
+              noteMetric('lcp', v);
+            }
           }
-        }
-      });
-      lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
-      observers.push(lcpObserver);
+        });
+        lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+        observers.push(lcpObserver);
+      }
 
-      // FID - First Input Delay
-      const fidObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        if (entries.length > 0 && vitals.fid === null) {
-          const firstEntry = entries[0] as PerformanceEventTiming;
-          const v = Math.round(firstEntry.processingStart - firstEntry.startTime);
-          vitals.fid = v;
-          noteMetric('fid', v);
-          fidObserver.disconnect();
-        }
-      });
-      fidObserver.observe({ type: 'first-input', buffered: true });
-      observers.push(fidObserver);
-
-      // CLS - Cumulative Layout Shift
-      let clsScore = 0;
-      const clsObserver = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const layoutShift = entry as LayoutShift;
-          if (!layoutShift.hadRecentInput) {
-            clsScore += layoutShift.value;
+      // FID - First Input Delay (requires user interaction - often never fires)
+      if (metricsSet.has('fid')) {
+        const fidObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          if (entries.length > 0 && vitals.fid === null) {
+            const firstEntry = entries[0] as PerformanceEventTiming;
+            const v = Math.round(firstEntry.processingStart - firstEntry.startTime);
+            vitals.fid = v;
+            noteMetric('fid', v);
+            fidObserver.disconnect();
           }
-        }
-        const v = Number(clsScore.toFixed(3));
-        vitals.cls = v;
-        noteMetric('cls', v);
-      });
-      clsObserver.observe({ type: 'layout-shift', buffered: true });
-      observers.push(clsObserver);
+        });
+        fidObserver.observe({ type: 'first-input', buffered: true });
+        observers.push(fidObserver);
+      }
+
+      // CLS - Cumulative Layout Shift (keeps updating - can cause long waits)
+      if (metricsSet.has('cls')) {
+        let clsScore = 0;
+        const clsObserver = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const layoutShift = entry as LayoutShift;
+            if (!layoutShift.hadRecentInput) {
+              clsScore += layoutShift.value;
+            }
+          }
+          const v = Number(clsScore.toFixed(3));
+          vitals.cls = v;
+          noteMetric('cls', v);
+        });
+        clsObserver.observe({ type: 'layout-shift', buffered: true });
+        observers.push(clsObserver);
+      }
 
       // Resolve early if page becomes hidden
       if (typeof document !== 'undefined') {
@@ -231,12 +252,14 @@ export async function collectPerformance(options: {
   includeNavigationTiming?: boolean;
   includeResources?: boolean;
   webVitalsTimeout?: number;
+  webVitalsMetrics?: Array<keyof WebVitals>;
 } = {}): Promise<PerformanceData> {
   const {
     includeWebVitals = true,
     includeNavigationTiming = true,
     includeResources = false,
-    webVitalsTimeout = 5000,
+    webVitalsTimeout = 500,
+    webVitalsMetrics = ['ttfb', 'fcp', 'lcp'],
   } = options;
 
   const emptyWebVitals: WebVitals = {
@@ -247,7 +270,7 @@ export async function collectPerformance(options: {
     ttfb: null,
   };
 
-  const webVitals = includeWebVitals ? await getWebVitals(webVitalsTimeout) : emptyWebVitals;
+  const webVitals = includeWebVitals ? await getWebVitals(webVitalsTimeout, webVitalsMetrics) : emptyWebVitals;
   const timing: TimingData = includeNavigationTiming
     ? getNavigationTiming()
     : { dnsLookup: 0, tcpConnect: 0, ttfb: 0, domReady: 0, loadComplete: 0 };

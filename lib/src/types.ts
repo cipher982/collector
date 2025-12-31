@@ -233,19 +233,28 @@ export interface FingerprintConfig {
 }
 
 /**
+ * Web vital metric names
+ */
+export type WebVitalMetric = 'ttfb' | 'fcp' | 'lcp' | 'fid' | 'cls';
+
+/**
  * Performance collection options
  */
 export interface PerformanceConfig {
   webVitals: boolean;
   /**
    * How long to wait for web vitals observers to settle (ms).
-   *
-   * Notes:
-   * - Web-vitals can take seconds (or require user input) to fully stabilize.
-   * - For "fast first response" use cases, set this to a low number (e.g. 150–300ms)
-   *   or disable `webVitals` entirely.
+   * Default: 500ms (instant metrics resolve in <10ms)
    */
   webVitalsTimeoutMs?: number;
+  /**
+   * Which web vital metrics to collect.
+   * Default: ['ttfb', 'fcp', 'lcp'] - the instant/buffered ones.
+   * Excluded by default:
+   * - 'fid' - requires user interaction, never fires on page load
+   * - 'cls' - keeps updating as layout shifts, causes long waits
+   */
+  webVitalsMetrics?: WebVitalMetric[];
   navigationTiming: boolean;
   /** Can be large */
   resourceWaterfall: boolean;

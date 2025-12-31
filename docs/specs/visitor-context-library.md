@@ -12,7 +12,7 @@ Create a standalone, tree-shakeable JavaScript library for collecting browser/de
 2. **Configurable** - enable/disable modules, set endpoints, customize behavior
 3. **Lightweight** - core < 5KB gzipped, full < 15KB
 4. **Modern** - ES modules, TypeScript, tree-shakeable
-5. **Hostable** - serve from collector.drose.io/v1/context.min.js
+5. **Hostable** - serve from drose.io/collector/v1/context.min.js
 
 ## Decision Log
 
@@ -109,7 +109,7 @@ console.log(ctx.browser.userAgent);
 console.log(ctx.identity.visitorId);
 
 // Script tag
-<script src="https://collector.drose.io/v1/context.min.js"></script>
+<script src="https://drose.io/collector/v1/context.min.js"></script>
 <script>
   const ctx = await VisitorContext.collect();
 </script>
@@ -393,7 +393,7 @@ interface GpuData {
 
 Existing `static/script.js` (1655 lines) will be gradually deprecated:
 1. Phase 1-5: Build library with equivalent functionality
-2. Phase 6: collector.drose.io serves library
+2. Phase 6: drose.io/collector serves library
 3. Phase 7 (future): Migrate static/script.js to use library
 4. Phase 8 (future): Remove duplicated code from script.js
 
@@ -464,7 +464,7 @@ The Flask route `/v1/context.min.js`:
 
 **CDN-style script tag:**
 ```html
-<script src="https://collector.drose.io/v1/context.min.js"></script>
+<script src="https://drose.io/collector/v1/context.min.js"></script>
 <script>
   VisitorContext.collect().then(ctx => {
     console.log('Visitor ID:', ctx.identity.visitorId);
@@ -476,13 +476,13 @@ The Flask route `/v1/context.min.js`:
 **With versioning (future):**
 ```html
 <!-- Pin to specific version when needed -->
-<script src="https://collector.drose.io/v1/0.2.0/context.min.js"></script>
+<script src="https://drose.io/collector/v1/0.2.0/context.min.js"></script>
 ```
 
 **With subresource integrity (future):**
 ```html
 <script
-  src="https://collector.drose.io/v1/context.min.js"
+  src="https://drose.io/collector/v1/context.min.js"
   integrity="sha256-..."
   crossorigin="anonymous"
 ></script>
